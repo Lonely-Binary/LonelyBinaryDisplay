@@ -294,6 +294,9 @@ panels:
       (combo 1 of 4 was the correct card), rotation 0 upright at the stated
       size, all four edge bars visible so the glass really is the full 240x320
       of controller RAM and needs no offsets, and the backlight is active high.
-      STILL UNVERIFIED: the 40 MHz clock was never stress-tested, and only
-      rotation 0 was checked — 1, 2 and 3 are untried, and ILI9341 is the one
-      controller here with its own MADCTL rotation mapping.
+      40 MHz was later exercised for minutes under a full LVGL dashboard
+      (arc, scrolling chart, two bars, all redrawing four times a second)
+      through partial rendering, with no tearing — so the clock is good.
+      STILL UNVERIFIED: only rotation 0 has been checked. 1, 2 and 3 are
+      untried, and ILI9341 is the one controller here with its own MADCTL
+      rotation mapping, so those are the interesting ones.
