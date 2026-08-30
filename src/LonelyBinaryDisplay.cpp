@@ -83,6 +83,10 @@ bool LB_Display::begin(bool useCanvas) {
   return true;
 }
 
+uint16_t *LB_Display::framebuffer() const {
+  return _canvas ? _canvas->getFramebuffer() : nullptr;
+}
+
 void LB_Display::flush() {
   if (_canvas) _canvas->flush();
 }

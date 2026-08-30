@@ -65,6 +65,11 @@ class LB_Display {
   const LB_PanelDef *panel() const { return _panel; }
   bool hasCanvas() const { return _canvas != nullptr; }
 
+  // The RGB565 framebuffer when begin(true) was used, else nullptr. LVGL
+  // renders straight into this instead of into a buffer of its own, which
+  // makes the flush callback a no-op — see the Lonely Binary LVGL library.
+  uint16_t *framebuffer() const;
+
   // Push the framebuffer to the panel. No-op when begin() was called without a
   // canvas, so it is always safe to call.
   void flush();
