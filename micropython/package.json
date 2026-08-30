@@ -1,0 +1,9 @@
+{
+  "urls": [
+    ["lb_display.py", "github:Lonely-Binary/LonelyBinaryDisplay/micropython/lb_display.py"],
+    ["lb_panels.py",  "github:Lonely-Binary/LonelyBinaryDisplay/micropython/lb_panels.py"],
+    ["st77xx.py",     "github:Lonely-Binary/LonelyBinaryDisplay/micropython/st77xx.py"],
+    ["nv3007.py",     "github:Lonely-Binary/LonelyBinaryDisplay/micropython/nv3007.py"]
+  ],
+  "version": "0.1.0"
+}
