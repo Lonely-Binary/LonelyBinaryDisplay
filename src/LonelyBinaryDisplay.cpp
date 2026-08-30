@@ -318,6 +318,11 @@ void LB_Display::printInfo(Print &out) const {
              _inverted ? "" : "not ",
              _inverted == _panel->invert ? "" : " (forced)");
   out.printf("Framebuffer: %s\n", _canvas ? "yes (PSRAM canvas)" : "no (direct)");
+  // A customer whose screen misbehaves pastes this whole block into an AI
+  // assistant. Carrying the URL means the assistant is handed the library's
+  // real API along with the symptom, instead of guessing from TFT_eSPI.
+  out.println(F("AI reference: https://raw.githubusercontent.com/"
+                "Lonely-Binary/LonelyBinaryDisplay/main/llms.txt"));
   out.println(F("-------------------------------"));
 }
 
