@@ -23,7 +23,6 @@ TFT_096 = {
     "flip_x": False,
     "flip_y": False,
     "baudrate": 20000000,
-    "bl_pwm": False,
     "bl_active_low": True,
 }
 
@@ -41,7 +40,6 @@ TFT_18 = {
     "flip_x": True,
     "flip_y": True,
     "baudrate": 20000000,
-    "bl_pwm": False,
     "bl_active_low": False,
 }
 
@@ -59,7 +57,6 @@ TFT_20 = {
     "flip_x": False,
     "flip_y": False,
     "baudrate": 40000000,
-    "bl_pwm": False,
     "bl_active_low": False,
 }
 
@@ -77,7 +74,6 @@ TFT_24 = {
     "flip_x": False,
     "flip_y": False,
     "baudrate": 40000000,
-    "bl_pwm": False,
     "bl_active_low": False,
 }
 
@@ -95,7 +91,6 @@ TFT_28 = {
     "flip_x": False,
     "flip_y": False,
     "baudrate": 40000000,
-    "bl_pwm": False,
     "bl_active_low": False,
 }
 
@@ -113,7 +108,6 @@ TFT_35 = {
     "flip_x": False,
     "flip_y": False,
     "baudrate": 40000000,
-    "bl_pwm": False,
     "bl_active_low": False,
 }
 
@@ -131,7 +125,6 @@ NARROW_114 = {
     "flip_x": False,
     "flip_y": False,
     "baudrate": 8000000,
-    "bl_pwm": True,
     "bl_active_low": True,
 }
 
@@ -149,7 +142,6 @@ NARROW_168 = {
     "flip_x": False,
     "flip_y": False,
     "baudrate": 8000000,
-    "bl_pwm": True,
     "bl_active_low": True,
 }
 
@@ -167,7 +159,6 @@ NARROW_19 = {
     "flip_x": False,
     "flip_y": False,
     "baudrate": 8000000,
-    "bl_pwm": True,
     "bl_active_low": True,
 }
 
@@ -185,7 +176,6 @@ NARROW_225 = {
     "flip_x": False,
     "flip_y": False,
     "baudrate": 8000000,
-    "bl_pwm": True,
     "bl_active_low": True,
 }
 
@@ -203,7 +193,6 @@ NARROW_279 = {
     "flip_x": False,
     "flip_y": False,
     "baudrate": 20000000,
-    "bl_pwm": True,
     "bl_active_low": True,
 }
 

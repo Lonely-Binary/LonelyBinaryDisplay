@@ -55,7 +55,9 @@ wiring:
 # MicroPython driver needs them explicitly. Recorded here either way so the two
 # bindings cannot disagree.
 #
-# backlight.mode: onoff | pwm      backlight.active_low: LOW turns it ON
+# backlight_active_low: LOW turns the backlight ON. Every panel in the range
+# dims — the library always drives the backlight with LEDC PWM, so
+# backlight(0..255) behaves the same on all of them.
 
 panels:
   # ── TFT-LCD series (rectangular, portrait) ─────────────────────────────────
@@ -71,7 +73,7 @@ panels:
     bgr: true
     invert: false
     spi_hz: 20000000
-    backlight: { mode: onoff, active_low: true }   # the ONLY tft-lcd panel wired active-low
+    backlight_active_low: true   # the ONLY tft-lcd panel wired active-low
     notes: >-
       Arduino used gfx->begin() (SPI_DEFAULT_FREQ = 40 MHz on ESP32); MicroPython
       used 20 MHz. Taking the conservative value — verify on hardware.
@@ -90,7 +92,7 @@ panels:
     flip_x: true
     flip_y: true
     spi_hz: 20000000
-    backlight: { mode: onoff, active_low: false }
+    backlight_active_low: false
     notes: >-
       Arduino used the 40 MHz default; MicroPython used 20 MHz. Conservative
       value taken — verify on hardware.
@@ -107,7 +109,7 @@ panels:
     bgr: false
     invert: true
     spi_hz: 40000000
-    backlight: { mode: onoff, active_low: false }
+    backlight_active_low: false
 
   - id: tft_24
     name: '2.4 inch'
@@ -121,7 +123,7 @@ panels:
     bgr: false
     invert: true
     spi_hz: 40000000
-    backlight: { mode: onoff, active_low: false }
+    backlight_active_low: false
 
   - id: tft_28
     name: '2.8 inch'
@@ -135,7 +137,7 @@ panels:
     bgr: false
     invert: true
     spi_hz: 40000000
-    backlight: { mode: onoff, active_low: false }
+    backlight_active_low: false
 
   - id: tft_35
     name: '3.5 inch'
@@ -149,7 +151,7 @@ panels:
     bgr: true
     invert: true
     spi_hz: 40000000
-    backlight: { mode: onoff, active_low: false }
+    backlight_active_low: false
 
   # ── Narrow LCD series (strip format, landscape, PWM backlight) ─────────────
   - id: narrow_114
@@ -164,7 +166,7 @@ panels:
     bgr: false
     invert: true
     spi_hz: 8000000
-    backlight: { mode: pwm, active_low: true }
+    backlight_active_low: true
     notes: >-
       Arduino ran 8 MHz, MicroPython 20 MHz. Conservative value taken; if
       8 MHz holds on hardware at 20 MHz, raise it here once for both languages.
@@ -181,7 +183,7 @@ panels:
     bgr: false
     invert: false
     spi_hz: 8000000
-    backlight: { mode: pwm, active_low: true }
+    backlight_active_low: true
 
   - id: narrow_19
     name: '1.9 inch'
@@ -195,7 +197,7 @@ panels:
     bgr: false
     invert: true
     spi_hz: 8000000
-    backlight: { mode: pwm, active_low: true }
+    backlight_active_low: true
     notes: Arduino ran 8 MHz, MicroPython 20 MHz — verify on hardware.
 
   - id: narrow_225
@@ -210,7 +212,7 @@ panels:
     bgr: false
     invert: false
     spi_hz: 8000000
-    backlight: { mode: pwm, active_low: true }
+    backlight_active_low: true
     notes: Arduino ran 8 MHz, MicroPython 20 MHz — verify on hardware.
 
   - id: narrow_279
@@ -225,7 +227,7 @@ panels:
     bgr: false
     invert: false
     spi_hz: 20000000
-    backlight: { mode: pwm, active_low: true }
+    backlight_active_low: true
     init_ops: nv3007_279
     notes: >-
       Same NV3007 silicon as the 1.68 inch but a different voltage/gamma table.

@@ -20,17 +20,21 @@ Arduino/C++ **and** MicroPython, from one shared panel table.
 
 | Constant | Panel | Resolution | Driver | Backlight |
 |---|---|---|---|---|
-| `LB_TFT_096` | 0.96" | 80 × 160 | ST7735 | on/off, **active low** |
-| `LB_TFT_18` | 1.8" | 128 × 160 | ST7735 | on/off |
-| `LB_TFT_20` | 2.0" | 240 × 320 | ST7789 | on/off |
-| `LB_TFT_24` | 2.4" | 240 × 320 | ST7789 | on/off |
-| `LB_TFT_28` | 2.8" | 240 × 320 | ST7789 | on/off |
-| `LB_TFT_35` | 3.5" | 320 × 480 | ST7796 | on/off |
-| `LB_NARROW_114` | 1.14" | 135 × 240 | ST7789 | PWM, active low |
-| `LB_NARROW_168` | 1.68" | 142 × 428 | NV3007 | PWM, active low |
-| `LB_NARROW_19` | 1.9" | 170 × 320 | ST7789 | PWM, active low |
-| `LB_NARROW_225` | 2.25" | 76 × 284 | ST7789 | PWM, active low |
-| `LB_NARROW_279` | 2.79" | 142 × 428 | NV3007 | PWM, active low |
+| `LB_TFT_096` | 0.96" | 80 × 160 | ST7735 | **active low** |
+| `LB_TFT_18` | 1.8" | 128 × 160 | ST7735 | active high |
+| `LB_TFT_20` | 2.0" | 240 × 320 | ST7789 | active high |
+| `LB_TFT_24` | 2.4" | 240 × 320 | ST7789 | active high |
+| `LB_TFT_28` | 2.8" | 240 × 320 | ST7789 | active high |
+| `LB_TFT_35` | 3.5" | 320 × 480 | ST7796 | active high |
+| `LB_NARROW_114` | 1.14" | 135 × 240 | ST7789 | active low |
+| `LB_NARROW_168` | 1.68" | 142 × 428 | NV3007 | active low |
+| `LB_NARROW_19` | 1.9" | 170 × 320 | ST7789 | active low |
+| `LB_NARROW_225` | 2.25" | 76 × 284 | ST7789 | active low |
+| `LB_NARROW_279` | 2.79" | 142 × 428 | NV3007 | active low |
+
+**Every panel dims.** `backlight(0..255)` works the same on all of them — the
+library always drives the backlight with PWM, so full-on is just `255`. Whether
+the panel is wired active-low is the library's problem, not yours.
 
 MicroPython uses the same names without the `LB_` prefix (`TFT_24`,
 `NARROW_19`, …).
@@ -62,6 +66,48 @@ void setup() {
 void loop() {}
 ```
 
+### Using your own wiring
+
+The default GPIOs are the Lonely Binary breakout for the board you picked in
+**Tools ▸ Board**. On your own PCB, or on a dev board where those pins are
+taken, override them — **starting from the default**:
+
+```cpp
+LB_Display display(LB_TFT_24);
+
+void setup() {
+  LB_Wiring pins = LB_WIRING;   // the kit wiring for this board
+  pins.cs   = 5;                // ...change only what differs
+  pins.dc   = 16;
+  pins.rst  = 17;
+  pins.backlight = 4;           // or -1 if your board has no backlight pin
+
+  display.setWiring(pins);      // must be before begin()
+  display.begin();
+}
+```
+
+Copy `LB_WIRING` rather than filling an `LB_Wiring` from scratch: the `spiHost`
+field is a bus number whose meaning differs per chip — `VSPI` does not even
+exist as a name on the ESP32-S3 — so starting from the default gives you a bus
+that is already right for the MCU you are compiling for.
+
+The **panel constant does not change.** Driver IC, resolution, offsets, colour
+order and backlight polarity belong to the screen; only the GPIOs belong to
+your board.
+
+Long ribbon extensions or jumper wires sometimes will not take the panel's
+rated clock — a scrambled or half-drawn image is the symptom:
+
+```cpp
+display.setSpiHz(20000000);     // before begin(); 0 restores the default
+```
+
+`printInfo()` prints the pins actually in use and marks them as custom, which
+makes a wiring mistake obvious in the serial log.
+
+See **File ▸ Examples ▸ Lonely Binary Display ▸ CustomPins**.
+
 ### Always write `auto *gfx`
 
 On a TFT, `gfx()` returns an `Arduino_GFX`. On an e-paper panel it returns a
@@ -77,7 +123,9 @@ the day you plug in an e-paper module.
 | `begin(bool useCanvas = false)` | Bring up SPI, panel and backlight. `true` allocates a PSRAM framebuffer (flicker-free redraws, and what LVGL wants). |
 | `gfx()` | The drawing surface. |
 | `flush()` | Push the framebuffer. No-op without a canvas, so always safe to call. |
-| `backlight(0..255)` | On/off vs PWM and active-high vs active-low are decided by the panel table, not by you. |
+| `backlight(0..255)` | PWM on every panel. Active-high vs active-low is decided by the panel table, not by you. |
+| `setWiring(pins)` | Your own GPIOs. Before `begin()`. |
+| `setSpiHz(hz)` | Override the panel's SPI clock. Before `begin()`; `0` restores the default. |
 | `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. |
 | `width()` / `height()` | Current size, rotation included. |
 | `selfTest()` | Colour bars, backlight sweep, panel identity. |
@@ -109,6 +157,21 @@ d.backlight(255)
 tft = d.gfx()
 tft.fill(BLACK)
 tft.text("Hello", 10, 10, WHITE, scale=2)
+```
+
+Your own wiring, same rule — copy the default, change what differs:
+
+```python
+import lb_panels
+from lb_display import LBDisplay, detect_board
+from lb_panels import TFT_24
+
+pins = dict(lb_panels.WIRING[detect_board()])
+pins["cs"] = 5
+pins["backlight"] = -1          # no backlight pin on this board
+
+d = LBDisplay(TFT_24, wiring=pins)
+d.begin()
 ```
 
 The API mirrors the Arduino one: `begin()`, `gfx()`, `backlight()`,
