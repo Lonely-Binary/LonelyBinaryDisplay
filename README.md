@@ -133,16 +133,24 @@ get yellow.
 LB_Display display(LB_TFT_18);
 
 void setup() {
-  // Colour order is fixed when the driver is constructed, so this one has to
-  // come BEFORE begin(). COLOR_AUTO (the default) uses the panel table.
-  display.setColorOrder(LB_Display::COLOR_BGR);
-
   display.begin();
 
-  // Inversion is a live register write, so it can be changed at any time —
-  // which makes it the one to sweep in a test sketch.
+  display.setColorOrder(LB_Display::COLOR_BGR);
   display.setInverted(true);
 }
+```
+
+Both are live register writes, so a test sketch can sweep them. The one
+exception is **ST7735**, where Arduino_GFX takes the colour order as a
+constructor argument — there `setColorOrder()` has to come *before* `begin()`,
+and it returns `false` if you call it too late rather than failing quietly.
+
+A third knob belongs with these two, for the same reason: the backlight can be
+wired either way round, and getting it wrong is easy to misread because the
+whole brightness scale simply runs backwards — dark at 255, bright at 0.
+
+```cpp
+display.setBacklightActiveLow(false);
 ```
 
 `printInfo()` reports both, and marks either as `(forced)` when you have
@@ -168,14 +176,15 @@ the day you plug in an e-paper module.
 
 | | |
 |---|---|
-| `begin(bool useCanvas = false)` | Bring up SPI, panel and backlight. `true` allocates a PSRAM framebuffer (flicker-free redraws, and what LVGL wants). |
+| `begin(bool useCanvas = false)` | Bring up SPI, panel and backlight. `true` asks for a framebuffer (flicker-free redraws, and what LVGL wants); if there is no room it says so and draws direct instead, so it is safe to ask for. `hasCanvas()` reports what you got. |
 | `gfx()` | The drawing surface. |
 | `flush()` | Push the framebuffer. No-op without a canvas, so always safe to call. |
 | `backlight(0..255)` | PWM on every panel. Active-high vs active-low is decided by the panel table, not by you. |
 | `setWiring(pins)` | Your own GPIOs. Before `begin()`. |
 | `setSpiHz(hz)` | Override the panel's SPI clock. Before `begin()`; `0` restores the default. |
-| `setColorOrder(order)` | `COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Before `begin()`. |
+| `setColorOrder(order)` | `COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time, except on ST7735 where it must precede `begin()`. Returns `false` if it could not be applied. |
 | `setInverted(bool)` | Flip the panel's inversion. Any time. |
+| `setBacklightActiveLow(bool)` | Flip the backlight polarity. Any time. |
 | `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. |
 | `width()` / `height()` | Current size, rotation included. |
 | `selfTest()` | Colour bars, backlight sweep, panel identity. |
