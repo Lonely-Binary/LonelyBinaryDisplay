@@ -32,6 +32,16 @@ jobs:
           arduino-cli core update-index
           arduino-cli core install esp32:esp32
           arduino-cli lib install "GFX Library for Arduino"
+      - name: Build every example on both MCUs
+        run: |
+          set -e
+          for fqbn in esp32:esp32:esp32s3 esp32:esp32:esp32; do
+            for ex in examples/*/; do
+              echo "== $fqbn $ex"
+              arduino-cli compile --fqbn "$fqbn" --library . "$ex"
+            done
+          done
+
       # Every panel constant must compile on both MCUs. This is the cheap
       # version of the hardware sweep and catches a bad panels.yaml entry.
       - name: Compile every panel on both boards
