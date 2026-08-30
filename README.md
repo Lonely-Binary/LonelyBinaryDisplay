@@ -14,6 +14,14 @@ SPI clock and backlight polarity. The GPIOs follow the board you picked in
 
 Arduino/C++ **and** MicroPython, from one shared panel table.
 
+> **Writing your code with an AI?** Give it this first:
+> `https://raw.githubusercontent.com/Lonely-Binary/LonelyBinaryDisplay/main/llms.txt`
+>
+> That is [`llms.txt`](llms.txt) — the whole API in one page, written for an
+> assistant rather than for you. Without it the model falls back on the
+> `TFT_eSPI` and `Adafruit_ST7789` code it was trained on, which is confidently
+> wrong for these panels and reads like a dead screen.
+
 ---
 
 ## Supported panels

@@ -162,6 +162,11 @@ class LBDisplay:
             self.board, "  (custom wiring)" if self.custom_wiring else ""))
         print("Pins       : CS={} RST={} DC={} MOSI={} SCLK={} BL={}".format(
             w["cs"], w["rst"], w["dc"], w["mosi"], w["sclk"], w["backlight"]))
+        # A customer whose screen misbehaves pastes this whole block into an AI
+        # assistant. Carrying the URL means the assistant is handed the real API
+        # along with the symptom, instead of guessing from some other library.
+        print("AI reference: https://raw.githubusercontent.com/"
+              "Lonely-Binary/LonelyBinaryDisplay/main/llms.txt")
         print("-------------------------------")
 
     def self_test(self):
