@@ -83,15 +83,36 @@ static uint8_t lb_madctl(LB_Driver drv, uint8_t r, bool bgr) {
   return bits | (bgr ? BGR : 0);
 }
 
+uint8_t LB_Display::panelRotation() const {
+  return _driver ? _driver->getRotation() : _panel->rotation;
+}
+
 bool LB_Display::colorOrderIsBGR() const {
   if (_colorOrder == COLOR_RGB) return false;
   if (_colorOrder == COLOR_BGR) return true;
   return _panel->bgr;  // COLOR_AUTO: whatever the panel table says
 }
 
-void LB_Display::setColorOrder(ColorOrder order) {
-  if (_gfx) return;  // the driver has already been constructed
+bool LB_Display::setColorOrder(ColorOrder order) {
+  if (!_gfx) {                 // before begin(): always fine
+    _colorOrder = order;
+    return true;
+  }
+  if (_panel->driver == LB_DRV_ST7735) {
+    // Arduino_GFX takes the order as a constructor argument for this driver,
+    // and the object is already built.
+    Serial.println(F("[LB_Display] setColorOrder() must precede begin() on an "
+                     "ST7735 panel."));
+    return false;
+  }
+  // Everywhere else it is only a bit in MADCTL, so it can be changed live.
   _colorOrder = order;
+  applyColorOrder();
+  setInverted(_panel->invert);
+
+  backlightBegin();
+  backlight(255);
+  return true;
 }
 
 void LB_Display::setInverted(bool inverted) {
@@ -102,15 +123,23 @@ void LB_Display::setInverted(bool inverted) {
 }
 
 // ST7735 took the colour order in its constructor; the others hardcode a bit
-// in MADCTL, so re-send the register whenever our choice differs from theirs.
+// in MADCTL, so we own that register for them and always write it.
+//
+// The rotation fed to lb_madctl() has to be the PANEL's, not _gfx's: with a
+// canvas in play _gfx is the framebuffer and reports rotation 0, so using it
+// reprogrammed a landscape panel back to portrait scan order and the screen
+// turned to garbage. Found on the 1.9" with a canvas allocated.
+//
+// It is tempting to skip the write when the request happens to match the
+// driver's own hardcoded default — and that is a bug, found on a 1.9" ST7789:
+// after forcing BGR, asking for RGB again matched ST7789's default, the write
+// was skipped, and the panel stayed in BGR. The driver only ever writes MADCTL
+// from setRotation(), so "switching back" has no other path. Always write.
 void LB_Display::applyColorOrder() {
   if (_panel->driver == LB_DRV_ST7735) return;  // handled at construction
-  const bool want = colorOrderIsBGR();
-  const bool driverDefault = (_panel->driver == LB_DRV_ST7796);  // others: RGB
-  if (want == driverDefault) { _madctlOverride = false; return; }
   _madctlOverride = true;
   _bus->beginWrite();
-  _bus->writeC8D8(0x36, lb_madctl(_panel->driver, rotation(), want));
+  _bus->writeC8D8(0x36, lb_madctl(_panel->driver, panelRotation(), colorOrderIsBGR()));
   _bus->endWrite();
 }
 
@@ -131,35 +160,43 @@ bool LB_Display::begin(bool useCanvas) {
   _driver = makeDriver();
   if (!_driver) return false;
 
+  // Bring the panel up FIRST. Arduino_TFT only swaps WIDTH/HEIGHT for a
+  // landscape rotation inside setRotation(), which begin() is what calls — so
+  // reading _driver->width() before this point returns the portrait size and a
+  // canvas built from it comes out the wrong shape. That bug reached hardware:
+  // a 170x320 panel at rotation 1 reported 170x320 instead of 320x170 and LVGL
+  // drew into a slice of the screen.
+  if (!_driver->begin(spiHz)) {
+    Serial.println(F("[LB_Display] panel begin failed — check the wiring, "
+                     "DC in particular."));
+    return false;
+  }
+  _gfx = _driver;
+
   if (useCanvas) {
-    // Canvas dimensions follow the panel's shipping rotation, which the driver
-    // has already applied.
+    // Now the driver knows its rotated size, so the framebuffer matches it.
     _canvas = new Arduino_Canvas(_driver->width(), _driver->height(), _driver);
-    // Arduino_Canvas::begin() brings up the output panel too.
-    if (!_canvas->begin(spiHz)) {
-      Serial.println(F("[LB_Display] canvas begin failed."));
-      Serial.println(F("[LB_Display] A framebuffer needs width*height*2 bytes. "
-                       "Set Tools > PSRAM to Enabled, or call begin() without "
-                       "a canvas."));
-      return false;
+    // GFX_SKIP_OUTPUT_BEGIN: the panel is already up, do not re-init it.
+    if (_canvas->begin(GFX_SKIP_OUTPUT_BEGIN)) {
+      _gfx = _canvas;
+    } else {
+      // width * height * 2 bytes would not fit. Fall back to drawing straight
+      // at the panel rather than failing: begin(true) is a preference, not a
+      // requirement, and hasCanvas() reports which one you got.
+      delete _canvas;
+      _canvas = nullptr;
+      Serial.printf("[LB_Display] no room for a %d x %d framebuffer "
+                    "(%lu bytes) — drawing direct instead. Enable "
+                    "Tools > PSRAM if your board has it.\n",
+                    _driver->width(), _driver->height(),
+                    (unsigned long)_driver->width() * _driver->height() * 2);
     }
-    _gfx = _canvas;
-  } else {
-    if (!_driver->begin(spiHz)) {
-      Serial.println(F("[LB_Display] panel begin failed — check the wiring, "
-                       "DC in particular."));
-      return false;
-    }
-    _gfx = _driver;
   }
 
   applyColorOrder();
-  setInverted(_panel->invert);
-
-  backlightBegin();
-  backlight(255);
   return true;
 }
+
 
 uint16_t *LB_Display::framebuffer() const {
   return _canvas ? _canvas->getFramebuffer() : nullptr;
@@ -171,12 +208,23 @@ void LB_Display::flush() {
 
 void LB_Display::setRotation(uint8_t r) {
   if (!_gfx) return;
-  _gfx->setRotation(r & 3);
+  r &= 3;
+  if (_canvas && ((r ^ rotation()) & 1)) {
+    // Portrait <-> landscape would need a framebuffer of the other shape, and
+    // the one we allocated is the wrong way round. Refuse rather than render
+    // into a mis-shaped buffer.
+    Serial.println(F("[LB_Display] cannot switch between portrait and "
+                     "landscape while a canvas is allocated — set the rotation "
+                     "before begin(true), or use begin() without a canvas."));
+    return;
+  }
+  _gfx->setRotation(r);
   // The driver just rewrote MADCTL from its own idea of the colour order, so
   // ours has to go back on top.
   if (_madctlOverride) {
     _bus->beginWrite();
-    _bus->writeC8D8(0x36, lb_madctl(_panel->driver, r & 3, colorOrderIsBGR()));
+    _bus->writeC8D8(0x36,
+                    lb_madctl(_panel->driver, panelRotation(), colorOrderIsBGR()));
     _bus->endWrite();
   }
 }
@@ -184,6 +232,7 @@ void LB_Display::setRotation(uint8_t r) {
 // ─── Backlight ───────────────────────────────────────────────────────────────
 
 void LB_Display::backlightBegin() {
+  if (!_blPolarityForced) _blActiveLow = _panel->blActiveLow;
   // Every panel in the range dims, so the backlight is always driven by LEDC
   // rather than digitalWrite. backlight(255) is simply full brightness, which
   // makes the on/off case a special case of the same call.
@@ -197,13 +246,20 @@ void LB_Display::backlightBegin() {
   _blReady = true;
 }
 
+void LB_Display::setBacklightActiveLow(bool activeLow) {
+  _blActiveLow = activeLow;
+  _blPolarityForced = true;
+  backlight(_blLevel);   // re-apply at the new polarity straight away
+}
+
 void LB_Display::backlight(uint8_t level) {
   if (!_blReady || _wiring.backlight < 0) return;
 
   // Active-low panels want a LOW duty cycle to be bright. Getting this
   // backwards is the classic "why is my screen dark at 255" bug — it is
   // decided by the panel table, not by the sketch.
-  uint8_t duty = _panel->blActiveLow ? (uint8_t)(255 - level) : level;
+  _blLevel = level;
+  uint8_t duty = _blActiveLow ? (uint8_t)(255 - level) : level;
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
   ledcWrite(_wiring.backlight, duty);
 #else
@@ -223,8 +279,9 @@ void LB_Display::printInfo(Print &out) const {
   out.printf("SPI clock  : %ld Hz%s\n",
              (long)(_spiHzOverride ? _spiHzOverride : _panel->spiHz),
              _spiHzOverride ? "  (overridden)" : "");
-  out.printf("Backlight  : PWM, active %s%s\n",
-             _panel->blActiveLow ? "LOW" : "HIGH",
+  out.printf("Backlight  : PWM, active %s%s%s\n",
+             _blActiveLow ? "LOW" : "HIGH",
+             _blPolarityForced ? " (forced)" : "",
              _wiring.backlight < 0 ? "  (no pin — not driven)" : "");
   out.printf("Board      : %s%s\n", LB_WIRING_NAME,
              _customWiring ? "  (custom wiring)" : "");

@@ -90,14 +90,25 @@ class LB_Display {
   //     red -> yellow, green -> magenta,
   //     blue -> cyan                      BOTH are wrong
   //
-  // setColorOrder() must be called before begin(). setInverted() works at any
-  // time, so it is the one to sweep in a test sketch.
+  // setInverted() works at any time. setColorOrder() works at any time too on
+  // ST7789 / ST7796 / NV3007, where the order is just a bit in MADCTL — but
+  // NOT on ST7735, whose driver takes it as a constructor argument, so there
+  // it has to precede begin(). It returns false if it could not be applied.
   enum ColorOrder { COLOR_AUTO, COLOR_RGB, COLOR_BGR };
-  void setColorOrder(ColorOrder order);
+  bool setColorOrder(ColorOrder order);
   void setInverted(bool inverted);
 
   bool colorOrderIsBGR() const;
   bool inverted() const { return _inverted; }
+
+  // Backlight polarity. Like the two above, the panel table already knows this
+  // for every screen we sell; this is for a bare panel, or for settling an
+  // argument on the bench. Symptom of getting it wrong: backlight(255) is dark
+  // and backlight(0) is bright — the whole scale runs backwards.
+  //
+  // Runtime, because duty is computed on every call.
+  void setBacklightActiveLow(bool activeLow);
+  bool backlightActiveLow() const { return _blActiveLow; }
 
   // Bring up SPI, the panel and the backlight pin. Returns false if the panel
   // driver refuses to start (almost always a wiring fault — check DC first).
@@ -157,10 +168,18 @@ class LB_Display {
   Arduino_GFX       *_gfx    = nullptr;  // canvas if present, else driver
   bool               _blReady = false;
   ColorOrder         _colorOrder = COLOR_AUTO;
+  bool               _blActiveLow = false;   // set from the panel in begin()
+  bool               _blPolarityForced = false;
+  uint8_t            _blLevel = 255;
   bool               _inverted = false;
   bool               _madctlOverride = false;
 
   Arduino_GFX *makeDriver();
+  // The PANEL's rotation, which is not the same thing as rotation(). With a
+  // canvas, _gfx is the framebuffer — rotation 0 — while the driver holds the
+  // orientation MADCTL was actually programmed for. Anything that writes
+  // MADCTL must use this one.
+  uint8_t panelRotation() const;
   void backlightBegin();
   void applyColorOrder();
 };

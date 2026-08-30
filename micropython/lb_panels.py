@@ -36,7 +36,7 @@ TFT_18 = {
     "xstart": 0,
     "ystart": 0,
     "bgr": False,
-    "invert": False,
+    "invert": True,
     "flip_x": True,
     "flip_y": True,
     "baudrate": 20000000,

@@ -9,6 +9,25 @@
 # this file; CI fails the build if the generated files are stale.
 #
 # Adding a new panel = adding one entry here. No code changes.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# NOTHING IN THIS FILE HAS BEEN MEASURED ON A KIT PANEL YET.
+#
+# Every value was inferred by reading the old per-panel sketches, and those two
+# code paths do not even agree with each other. The clearest example is bgr on
+# the ST7735 panels: the Arduino sketches let Arduino_GFX default to BGR, while
+# the MicroPython scripts passed bgr=False, i.e. RGB. One of them has been
+# wrong the whole time and nobody noticed, because the old test drew UNLABELLED
+# colour bars — you cannot tell red from blue in a bar with no caption.
+#
+# So: verify each panel on a REAL KIT PANEL on the REAL BREAKOUT before
+# treating any of this as settled, and annotate what you measured.
+#
+# Do NOT copy values out of internal/ bench runs. Those sketches deliberately
+# drive non-standard panels on non-standard wiring to exercise the manual
+# overrides (setColorOrder / setInverted / setBacklightActiveLow); what they
+# report is a property of whatever is on the desk that day, not of the product.
+# ─────────────────────────────────────────────────────────────────────────────
 # ─────────────────────────────────────────────────────────────────────────────
 version: 1
 
@@ -89,8 +108,8 @@ panels:
     height: 160
     rotation: 0
     offsets: [0, 0, 0, 0]
-    bgr: false        # bench-verified 2026-08-30: BGR shows red as blue
-    invert: false     # bench-verified 2026-08-30: inverted washes black out
+    bgr: false        # UNVERIFIED — see the warning at the top of this file
+    invert: true
     flip_x: true
     flip_y: true
     spi_hz: 20000000

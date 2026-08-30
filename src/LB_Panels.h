@@ -36,7 +36,7 @@ struct LB_PanelDef {
 
 static const LB_PanelDef LB_PANELS[] = {
   { "tft_096", "0.96 inch", LB_DRV_ST7735, 80, 160, 0, true, false, false, false, 24, 0, 24, 0, 20000000, true, LB_INIT_NONE },
-  { "tft_18", "1.8 inch", LB_DRV_ST7735, 128, 160, 0, false, false, true, true, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE },
+  { "tft_18", "1.8 inch", LB_DRV_ST7735, 128, 160, 0, false, true, true, true, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE },
   { "tft_20", "2.0 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
   { "tft_24", "2.4 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
   { "tft_28", "2.8 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
