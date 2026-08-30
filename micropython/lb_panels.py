@@ -196,6 +196,39 @@ NARROW_279 = {
     "bl_active_low": True,
 }
 
+ILI9341_240X320 = {
+    "id": "ili9341_240x320",
+    "name": "ILI9341 240x320",
+    "cls": "ILI9341",
+    "width": 240,
+    "height": 320,
+    "rotation": 0,
+    "xstart": 0,
+    "ystart": 0,
+    "bgr": True,
+    "invert": False,
+    "flip_x": False,
+    "flip_y": False,
+    "baudrate": 40000000,
+    "bl_active_low": False,
+}
+
+# Panels Lonely Binary sells.
+PRODUCTS = {
+    "tft_096": TFT_096,
+    "tft_18": TFT_18,
+    "tft_20": TFT_20,
+    "tft_24": TFT_24,
+    "tft_28": TFT_28,
+    "tft_35": TFT_35,
+    "narrow_114": NARROW_114,
+    "narrow_168": NARROW_168,
+    "narrow_19": NARROW_19,
+    "narrow_225": NARROW_225,
+    "narrow_279": NARROW_279,
+}
+
+# Everything the library can drive, products included.
 PANELS = {
     "tft_096": TFT_096,
     "tft_18": TFT_18,
@@ -208,4 +241,5 @@ PANELS = {
     "narrow_19": NARROW_19,
     "narrow_225": NARROW_225,
     "narrow_279": NARROW_279,
+    "ili9341_240x320": ILI9341_240X320,
 }

@@ -60,6 +60,18 @@ wiring:
     psram: false
 
 # ── Panels ───────────────────────────────────────────────────────────────────
+# product: true  = something Lonely Binary sells. These are the only entries a
+#                  customer should ever have to look at; they pick by the size
+#                  printed on the box and never see anything else.
+# product: false = a panel we do not sell but can drive. Named by CONTROLLER
+#                  and resolution rather than by size, so it cannot be mistaken
+#                  for a product. This is the same two-namespace split
+#                  LovyanGFX and Espressif's ESP32_Display_Panel use: product
+#                  or board names on top, controller names underneath.
+#
+# const: overrides the generated constant name. Use it when the id has to stay
+#        precise for device_info while the name in a sketch stays readable.
+#
 # offsets: [col1, row1, col2, row2]
 #   Arduino_GFX takes two pairs: pair 1 applies at rotation 0/2, pair 2 at 1/3.
 #   The MicroPython driver takes a single xstart/ystart — the generator picks
@@ -85,6 +97,7 @@ wiring:
 panels:
   # ── TFT-LCD series (rectangular, portrait) ─────────────────────────────────
   - id: tft_096
+    product: true
     name: '0.96 inch'
     family: tft-lcd
     driver: ST7735
@@ -101,6 +114,7 @@ panels:
       used 20 MHz. Taking the conservative value — verify on hardware.
 
   - id: tft_18
+    product: true
     name: '1.8 inch'
     family: tft-lcd
     driver: ST7735
@@ -119,6 +133,7 @@ panels:
       value taken — verify on hardware.
 
   - id: tft_20
+    product: true
     name: '2.0 inch'
     family: tft-lcd
     driver: ST7789
@@ -132,6 +147,7 @@ panels:
     backlight_active_low: false
 
   - id: tft_24
+    product: true
     name: '2.4 inch'
     family: tft-lcd
     driver: ST7789
@@ -145,6 +161,7 @@ panels:
     backlight_active_low: false
 
   - id: tft_28
+    product: true
     name: '2.8 inch'
     family: tft-lcd
     driver: ST7789
@@ -158,6 +175,7 @@ panels:
     backlight_active_low: false
 
   - id: tft_35
+    product: true
     name: '3.5 inch'
     family: tft-lcd
     driver: ST7796
@@ -172,6 +190,7 @@ panels:
 
   # ── Narrow LCD series (strip format, landscape, PWM backlight) ─────────────
   - id: narrow_114
+    product: true
     name: '1.14 inch'
     family: narrow-lcd
     driver: ST7789
@@ -188,6 +207,7 @@ panels:
       8 MHz holds on hardware at 20 MHz, raise it here once for both languages.
 
   - id: narrow_168
+    product: true
     name: '1.68 inch'
     family: narrow-lcd
     driver: NV3007
@@ -201,6 +221,7 @@ panels:
     backlight_active_low: true
 
   - id: narrow_19
+    product: true
     name: '1.9 inch'
     family: narrow-lcd
     driver: ST7789
@@ -215,6 +236,7 @@ panels:
     notes: Arduino ran 8 MHz, MicroPython 20 MHz — verify on hardware.
 
   - id: narrow_225
+    product: true
     name: '2.25 inch'
     family: narrow-lcd
     driver: ST7789
@@ -229,6 +251,7 @@ panels:
     notes: Arduino ran 8 MHz, MicroPython 20 MHz — verify on hardware.
 
   - id: narrow_279
+    product: true
     name: '2.79 inch'
     family: narrow-lcd
     driver: NV3007
@@ -244,3 +267,29 @@ panels:
     notes: >-
       Same NV3007 silicon as the 1.68 inch but a different voltage/gamma table.
       Without init_ops it would inherit the 1.68 inch settings and look wrong.
+
+  # ── Panels we do NOT sell ──────────────────────────────────────────────────
+  #
+  # Driveable, but not products. Keyed by controller + resolution so nobody
+  # shopping for "the 2.8 inch" can land here by mistake — the 2.8 inch we sell
+  # is tft_28, an ST7789, and it is in the list above.
+
+  - id: ili9341_240x320
+    product: false
+    const: LB_ILI9341_240X320
+    name: 'ILI9341 240x320'
+    family: generic
+    driver: ILI9341
+    width: 240
+    height: 320
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: true
+    invert: false
+    spi_hz: 40000000
+    backlight_active_low: false
+    notes: >-
+      EVERY VALUE HERE IS A GUESS and none of it has been near the panel. The
+      resolution is not even confirmed. Arduino_GFX's ILI9341 driver hardcodes
+      BGR in MADCTL and defaults to 240x320, which is where these came from.
+      Run internal/ILI9341/Bench before believing any of it.

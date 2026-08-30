@@ -39,6 +39,10 @@ the panel is wired active-low is the library's problem, not yours.
 MicroPython uses the same names without the `LB_` prefix (`TFT_24`,
 `NARROW_19`, …).
 
+Pick by the size printed on your display. That is the whole decision — the
+driver IC, resolution, offsets, colour order and backlight polarity all follow
+from it, and there is never more than one entry for a size.
+
 ---
 
 ## Arduino
@@ -269,6 +273,28 @@ python3 tools/gen_panels.py
 No code changes. Never hand-edit the generated files — CI runs
 `gen_panels.py --check` and fails the build if they are stale, which is what
 keeps the C++ and Python tables from quietly disagreeing.
+
+---
+
+## Other panels (not sold by Lonely Binary)
+
+**If you bought a display from us, you do not need this section** — yours is in
+the table at the top of this page, and it is the only 2.8 inch, the only 1.9
+inch, and so on. Nothing below competes with it.
+
+These are panels we do **not** stock and do **not** support. They are listed
+because the library happens to drive them and it costs nothing to say so. They
+are named by **controller and resolution** rather than by size, precisely so
+they cannot be mistaken for a product:
+
+| Constant | Controller | Resolution | Status |
+|---|---|---|---|
+| `LB_ILI9341_240X320` | ILI9341 | 240 × 320 | **unverified — every value is a guess** |
+
+Unverified means exactly that: nobody has run it. Expect to need
+[`setColorOrder()` / `setInverted()` / `setBacklightActiveLow()`](#when-the-colours-come-out-wrong)
+and quite possibly `setSpiHz()`. If you get one working, the numbers are
+welcome.
 
 ---
 

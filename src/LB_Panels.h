@@ -8,6 +8,7 @@ enum LB_Driver : uint8_t {
   LB_DRV_ST7789,
   LB_DRV_ST7796,
   LB_DRV_NV3007,
+  LB_DRV_ILI9341,
 };
 
 // Panels whose controller needs a vendor init table that differs from the
@@ -46,20 +47,28 @@ static const LB_PanelDef LB_PANELS[] = {
   { "narrow_19", "1.9 inch", LB_DRV_ST7789, 170, 320, 1, false, true, false, false, 35, 0, 35, 0, 8000000, true, LB_INIT_NONE },
   { "narrow_225", "2.25 inch", LB_DRV_ST7789, 76, 284, 1, false, false, false, false, 82, 18, 82, 18, 8000000, true, LB_INIT_NONE },
   { "narrow_279", "2.79 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 20000000, true, LB_INIT_NV3007_279 },
+  { "ili9341_240x320", "ILI9341 240x320", LB_DRV_ILI9341, 240, 320, 0, true, false, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
 };
 
-#define LB_PANEL_COUNT 11
+#define LB_PANEL_COUNT 12
 
 // Pass one of these to LB_Display. Changing this constant is the only
 // edit needed to swap panels — everything else is inherited.
-#define LB_TFT_096    (&LB_PANELS[0])   // 0.96 inch 80x160 ST7735
-#define LB_TFT_18     (&LB_PANELS[1])   // 1.8 inch 128x160 ST7735
-#define LB_TFT_20     (&LB_PANELS[2])   // 2.0 inch 240x320 ST7789
-#define LB_TFT_24     (&LB_PANELS[3])   // 2.4 inch 240x320 ST7789
-#define LB_TFT_28     (&LB_PANELS[4])   // 2.8 inch 240x320 ST7789
-#define LB_TFT_35     (&LB_PANELS[5])   // 3.5 inch 320x480 ST7796
-#define LB_NARROW_114 (&LB_PANELS[6])   // 1.14 inch 135x240 ST7789
-#define LB_NARROW_168 (&LB_PANELS[7])   // 1.68 inch 142x428 NV3007
-#define LB_NARROW_19  (&LB_PANELS[8])   // 1.9 inch 170x320 ST7789
-#define LB_NARROW_225 (&LB_PANELS[9])   // 2.25 inch 76x284 ST7789
-#define LB_NARROW_279 (&LB_PANELS[10])   // 2.79 inch 142x428 NV3007
+
+// ── Lonely Binary panels ─────────────────────────────────────
+#define LB_TFT_096         (&LB_PANELS[0])   // 0.96 inch 80x160 ST7735
+#define LB_TFT_18          (&LB_PANELS[1])   // 1.8 inch 128x160 ST7735
+#define LB_TFT_20          (&LB_PANELS[2])   // 2.0 inch 240x320 ST7789
+#define LB_TFT_24          (&LB_PANELS[3])   // 2.4 inch 240x320 ST7789
+#define LB_TFT_28          (&LB_PANELS[4])   // 2.8 inch 240x320 ST7789
+#define LB_TFT_35          (&LB_PANELS[5])   // 3.5 inch 320x480 ST7796
+#define LB_NARROW_114      (&LB_PANELS[6])   // 1.14 inch 135x240 ST7789
+#define LB_NARROW_168      (&LB_PANELS[7])   // 1.68 inch 142x428 NV3007
+#define LB_NARROW_19       (&LB_PANELS[8])   // 1.9 inch 170x320 ST7789
+#define LB_NARROW_225      (&LB_PANELS[9])   // 2.25 inch 76x284 ST7789
+#define LB_NARROW_279      (&LB_PANELS[10])   // 2.79 inch 142x428 NV3007
+
+// ── Panels we do not sell, but can drive ─────────────────────
+// Named by controller, not by size, so they cannot be confused with
+// the products above. If you bought a display from us it is up there.
+#define LB_ILI9341_240X320 (&LB_PANELS[11])   // ILI9341 240x320
