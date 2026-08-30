@@ -37,6 +37,13 @@ Arduino_GFX *LB_Display::makeDriver() {
       return new Arduino_ST7796(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
                                 p->width, p->height,
                                 p->colOff1, p->rowOff1, p->colOff2, p->rowOff2);
+    case LB_DRV_ILI9341:
+      // Hardcodes BGR in its own MADCTL, so like ST7789 and ST7796 the colour
+      // order comes from our register rewrite rather than a constructor arg.
+      return new Arduino_ILI9341(_bus, _wiring.rst, p->rotation, p->invert,
+                                 p->width, p->height,
+                                 p->colOff1, p->rowOff1, p->colOff2, p->rowOff2);
+
     case LB_DRV_NV3007:
       // The 2.79" is the same silicon as the 1.68" but needs its own
       // voltage/gamma table — without it the panel comes up looking wrong.
@@ -67,6 +74,14 @@ static uint8_t lb_madctl(LB_Driver drv, uint8_t r, bool bgr) {
       case 2:  bits = 0;       break;
       case 3:  bits = MX | MV; break;
       default: bits = MX | MY; break;
+    }
+  } else if (drv == LB_DRV_ILI9341) {
+    // A third mapping again — ILI9341 agrees with neither family above.
+    switch (r & 3) {
+      case 1:  bits = MV;           break;
+      case 2:  bits = MY;           break;
+      case 3:  bits = MX | MY | MV; break;
+      default: bits = MX;           break;
     }
   } else {  // ST7789 / ST7796 / NV3007 share one mapping
     switch (r & 7) {
@@ -270,7 +285,8 @@ void LB_Display::backlight(uint8_t level) {
 // ─── Diagnostics ─────────────────────────────────────────────────────────────
 
 void LB_Display::printInfo(Print &out) const {
-  static const char *kDrivers[] = {"ST7735", "ST7789", "ST7796", "NV3007"};
+  static const char *kDrivers[] = {"ST7735", "ST7789", "ST7796", "NV3007",
+                                   "ILI9341"};
   out.println(F("---- Lonely Binary Display ----"));
   out.printf("Panel      : %s (%s)\n", _panel->name, _panel->id);
   out.printf("Driver IC  : %s\n", kDrivers[_panel->driver]);

@@ -25,13 +25,14 @@ OUT_PY = ROOT / "micropython" / "lb_panels.py"
 
 BANNER = "GENERATED FROM panels.yaml BY tools/gen_panels.py — DO NOT EDIT"
 
-DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007"]
+DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341"]
 INIT_OPS = {None: "LB_INIT_NONE", "nv3007_279": "LB_INIT_NV3007_279"}
 
 
-def const_name(pid: str) -> str:
-    """tft_24 -> LB_TFT_24 ;  narrow_114 -> LB_NARROW_114"""
-    return "LB_" + pid.upper()
+def const_name(panel) -> str:
+    """tft_24 -> LB_TFT_24. An explicit `const:` wins, so an id can stay precise
+    for device_info while the name a sketch uses stays short."""
+    return panel.get("const") or ("LB_" + panel["id"].upper())
 
 
 def cbool(v) -> str:
@@ -99,14 +100,31 @@ def gen_header(doc) -> str:
             )
         )
     L += ["};", "", f"#define LB_PANEL_COUNT {len(panels)}", ""]
+    width = max(len(const_name(p)) for p in panels)
+
     L.append("// Pass one of these to LB_Display. Changing this constant is the only")
     L.append("// edit needed to swap panels — everything else is inherited.")
-    width = max(len(const_name(p["id"])) for p in panels)
+    L.append("")
+    L.append("// ── Lonely Binary panels ─────────────────────────────────────")
     for i, p in enumerate(panels):
+        if not p.get("product", True):
+            continue
         L.append(
-            f"#define {const_name(p['id']):<{width}} (&LB_PANELS[{i}])"
+            f"#define {const_name(p):<{width}} (&LB_PANELS[{i}])"
             f"   // {p['name']} {p['width']}x{p['height']} {p['driver']}"
         )
+
+    others = [(i, p) for i, p in enumerate(panels) if not p.get("product", True)]
+    if others:
+        L.append("")
+        L.append("// ── Panels we do not sell, but can drive ─────────────────────")
+        L.append("// Named by controller, not by size, so they cannot be confused with")
+        L.append("// the products above. If you bought a display from us it is up there.")
+        for i, p in others:
+            L.append(
+                f"#define {const_name(p):<{width}} (&LB_PANELS[{i}])"
+                f"   // {p['driver']} {p['width']}x{p['height']}"
+            )
     L.append("")
     return "\n".join(L)
 
@@ -172,7 +190,7 @@ def gen_python(doc) -> str:
     for p in panels:
         off = p["offsets"]
         xs, ys = (off[2], off[3]) if p["rotation"] % 2 else (off[0], off[1])
-        name = p["id"].upper()
+        name = (p.get("const") or ("LB_" + p["id"].upper()))[3:]
         names.append(name)
         cls = p["driver"]
         if p["driver"] == "NV3007":
@@ -196,7 +214,11 @@ def gen_python(doc) -> str:
             "}",
             "",
         ]
-    L.append("PANELS = {")
+    L.append("# Panels Lonely Binary sells.")
+    L.append("PRODUCTS = {")
+    L += [f'    "{p["id"]}": {n},' for p, n in zip(panels, names)
+          if p.get("product", True)]
+    L += ["}", "", "# Everything the library can drive, products included.", "PANELS = {"]
     L += [f'    "{p["id"]}": {n},' for p, n in zip(panels, names)]
     L += ["}", ""]
     return "\n".join(L)
