@@ -110,14 +110,17 @@ class LB_Display {
   void setBacklightActiveLow(bool activeLow);
   bool backlightActiveLow() const { return _blActiveLow; }
 
-  // Bring up SPI, the panel and the backlight pin. Returns false if the panel
-  // driver refuses to start (almost always a wiring fault — check DC first).
+  // Bring up SPI, the panel and the backlight, and turn the backlight on.
+  // Returns false if the panel driver refuses to start (almost always a wiring
+  // fault — check DC first).
   //
   // useCanvas allocates a full RGB565 framebuffer and draws into that, pushing
   // to the panel on flush(). It removes the flicker you get when redrawing
   // large text in place, and it is what LVGL wants. It needs
-  // width * height * 2 bytes, so it is PSRAM-only in practice: begin() returns
-  // false rather than half-working if the allocation fails.
+  // width * height * 2 bytes, so it is PSRAM-only in practice — but a canvas is
+  // a preference, not a requirement: if the allocation fails, begin() says so
+  // on Serial and draws straight at the panel instead of failing. So it is
+  // always safe to ask for one; hasCanvas() reports which you got.
   bool begin(bool useCanvas = false);
 
   // The drawing surface. Declare the receiving variable with `auto` — see the
