@@ -74,6 +74,31 @@ class LB_Display {
 
   const LB_Wiring &wiring() const { return _wiring; }
 
+  // ── Colour order and inversion ───────────────────────────────────────────
+  //
+  // Two panels with the same controller can be wired to their glass with the
+  // red and blue channels swapped, and can sit at rest inverted or not. The
+  // panel table carries the right answer for every screen we sell, so you
+  // normally touch neither of these. They are here for a panel we have not
+  // characterised yet, and for bench work.
+  //
+  // Read the symptom off the screen — send pure red, green and blue and see
+  // what comes back:
+  //
+  //     red -> blue,   blue -> red        colour order is wrong
+  //     black -> white                    inversion is wrong
+  //     red -> yellow, green -> magenta,
+  //     blue -> cyan                      BOTH are wrong
+  //
+  // setColorOrder() must be called before begin(). setInverted() works at any
+  // time, so it is the one to sweep in a test sketch.
+  enum ColorOrder { COLOR_AUTO, COLOR_RGB, COLOR_BGR };
+  void setColorOrder(ColorOrder order);
+  void setInverted(bool inverted);
+
+  bool colorOrderIsBGR() const;
+  bool inverted() const { return _inverted; }
+
   // Bring up SPI, the panel and the backlight pin. Returns false if the panel
   // driver refuses to start (almost always a wiring fault — check DC first).
   //
@@ -131,9 +156,13 @@ class LB_Display {
   Arduino_Canvas    *_canvas = nullptr;  // framebuffer, when requested
   Arduino_GFX       *_gfx    = nullptr;  // canvas if present, else driver
   bool               _blReady = false;
+  ColorOrder         _colorOrder = COLOR_AUTO;
+  bool               _inverted = false;
+  bool               _madctlOverride = false;
 
   Arduino_GFX *makeDriver();
   void backlightBegin();
+  void applyColorOrder();
 };
 
 #endif  // LONELY_BINARY_DISPLAY_H

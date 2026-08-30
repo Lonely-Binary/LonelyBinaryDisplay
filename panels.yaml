@@ -46,7 +46,11 @@ wiring:
 #   The MicroPython driver takes a single xstart/ystart — the generator picks
 #   the pair matching the panel's default `rotation`.
 #
-# bgr / invert / flip_x / flip_y are panel facts. NOTE: st77xx.ST77xx defaults
+# bgr / invert / flip_x / flip_y are panel facts. `invert` is the single
+# inversion flag: Arduino_GFX spells the same thing `ips` in its constructors
+# (that argument does nothing else), and the MicroPython driver calls it
+# `invert`. Carrying both names meant one of them silently did nothing.
+# NOTE: st77xx.ST77xx defaults
 # to invert=True, and the original per-panel main.py scripts relied on that
 # default rather than passing it — so "not mentioned in the old script" means
 # true here, not false. Getting this wrong shows as inverted colours.
@@ -68,7 +72,6 @@ panels:
     width: 80
     height: 160
     rotation: 0
-    ips: false
     offsets: [24, 0, 24, 0]
     bgr: true
     invert: false
@@ -85,10 +88,9 @@ panels:
     width: 128
     height: 160
     rotation: 0
-    ips: true
     offsets: [0, 0, 0, 0]
-    bgr: false
-    invert: true
+    bgr: false        # bench-verified 2026-08-30: BGR shows red as blue
+    invert: false     # bench-verified 2026-08-30: inverted washes black out
     flip_x: true
     flip_y: true
     spi_hz: 20000000
@@ -104,7 +106,6 @@ panels:
     width: 240
     height: 320
     rotation: 0
-    ips: true
     offsets: [0, 0, 0, 0]
     bgr: false
     invert: true
@@ -118,7 +119,6 @@ panels:
     width: 240
     height: 320
     rotation: 0
-    ips: true
     offsets: [0, 0, 0, 0]
     bgr: false
     invert: true
@@ -132,7 +132,6 @@ panels:
     width: 240
     height: 320
     rotation: 0
-    ips: true
     offsets: [0, 0, 0, 0]
     bgr: false
     invert: true
@@ -146,7 +145,6 @@ panels:
     width: 320
     height: 480
     rotation: 0
-    ips: true
     offsets: [0, 0, 0, 0]
     bgr: true
     invert: true
@@ -161,7 +159,6 @@ panels:
     width: 135
     height: 240
     rotation: 1
-    ips: true
     offsets: [52, 40, 53, 40]
     bgr: false
     invert: true
@@ -178,7 +175,6 @@ panels:
     width: 142
     height: 428
     rotation: 1
-    ips: false
     offsets: [12, 0, 14, 0]
     bgr: false
     invert: false
@@ -192,7 +188,6 @@ panels:
     width: 170
     height: 320
     rotation: 1
-    ips: true
     offsets: [35, 0, 35, 0]
     bgr: false
     invert: true
@@ -207,7 +202,6 @@ panels:
     width: 76
     height: 284
     rotation: 1
-    ips: false
     offsets: [82, 18, 82, 18]
     bgr: false
     invert: false
@@ -222,7 +216,6 @@ panels:
     width: 142
     height: 428
     rotation: 1
-    ips: false
     offsets: [12, 0, 14, 0]
     bgr: false
     invert: false

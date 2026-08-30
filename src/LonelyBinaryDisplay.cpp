@@ -17,34 +17,101 @@ LB_Display::~LB_Display() {
 
 Arduino_GFX *LB_Display::makeDriver() {
   const LB_PanelDef *p = _panel;
+  // Note on the `ips` argument below: in Arduino_GFX that flag does exactly
+  // one thing — decide whether the panel is inverted at rest — so our single
+  // `invert` field is what belongs there. Passing a separate "is it an IPS
+  // panel" value would silently fight setInverted().
   switch (p->driver) {
     case LB_DRV_ST7735:
-      return new Arduino_ST7735(_bus, _wiring.rst, p->rotation, p->ips,
+      // The only driver with a colour-order argument. Using it means no
+      // MADCTL patching is needed for these panels.
+      return new Arduino_ST7735(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
                                 p->width, p->height,
-                                p->colOff1, p->rowOff1, p->colOff2, p->rowOff2);
+                                p->colOff1, p->rowOff1, p->colOff2, p->rowOff2,
+                                colorOrderIsBGR());
     case LB_DRV_ST7789:
-      return new Arduino_ST7789(_bus, _wiring.rst, p->rotation, p->ips,
+      return new Arduino_ST7789(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
                                 p->width, p->height,
                                 p->colOff1, p->rowOff1, p->colOff2, p->rowOff2);
     case LB_DRV_ST7796:
-      return new Arduino_ST7796(_bus, _wiring.rst, p->rotation, p->ips,
+      return new Arduino_ST7796(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
                                 p->width, p->height,
                                 p->colOff1, p->rowOff1, p->colOff2, p->rowOff2);
     case LB_DRV_NV3007:
       // The 2.79" is the same silicon as the 1.68" but needs its own
       // voltage/gamma table — without it the panel comes up looking wrong.
       if (p->initOps == LB_INIT_NV3007_279) {
-        return new Arduino_NV3007(_bus, _wiring.rst, p->rotation, p->ips,
+        return new Arduino_NV3007(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
                                   p->width, p->height,
                                   p->colOff1, p->rowOff1, p->colOff2, p->rowOff2,
                                   nv3007_279_init_operations,
                                   sizeof(nv3007_279_init_operations));
       }
-      return new Arduino_NV3007(_bus, _wiring.rst, p->rotation, p->ips,
+      return new Arduino_NV3007(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
                                 p->width, p->height,
                                 p->colOff1, p->rowOff1, p->colOff2, p->rowOff2);
   }
   return nullptr;
+}
+
+// MADCTL (0x36) is the same register on every controller we drive, and bit 3
+// selects BGR. The rotation bits are not the same between families, so both
+// mappings are transcribed here from the Arduino_GFX drivers. This is chip
+// register semantics rather than library internals, so it is stable.
+static uint8_t lb_madctl(LB_Driver drv, uint8_t r, bool bgr) {
+  const uint8_t MY = 0x80, MX = 0x40, MV = 0x20, BGR = 0x08;
+  uint8_t bits;
+  if (drv == LB_DRV_ST7735) {
+    switch (r & 3) {
+      case 1:  bits = MY | MV; break;
+      case 2:  bits = 0;       break;
+      case 3:  bits = MX | MV; break;
+      default: bits = MX | MY; break;
+    }
+  } else {  // ST7789 / ST7796 / NV3007 share one mapping
+    switch (r & 7) {
+      case 1:  bits = MX | MV;      break;
+      case 2:  bits = MX | MY;      break;
+      case 3:  bits = MY | MV;      break;
+      case 4:  bits = MX;           break;
+      case 5:  bits = MX | MY | MV; break;
+      case 6:  bits = MY;           break;
+      case 7:  bits = MV;           break;
+      default: bits = 0;            break;
+    }
+  }
+  return bits | (bgr ? BGR : 0);
+}
+
+bool LB_Display::colorOrderIsBGR() const {
+  if (_colorOrder == COLOR_RGB) return false;
+  if (_colorOrder == COLOR_BGR) return true;
+  return _panel->bgr;  // COLOR_AUTO: whatever the panel table says
+}
+
+void LB_Display::setColorOrder(ColorOrder order) {
+  if (_gfx) return;  // the driver has already been constructed
+  _colorOrder = order;
+}
+
+void LB_Display::setInverted(bool inverted) {
+  _inverted = inverted;
+  // Arduino_GFX computes (_ips ^ i), and we hand it the panel's `invert` flag
+  // as `ips`, so passing the difference here lands on the requested state.
+  if (_driver) _driver->invertDisplay(inverted != _panel->invert);
+}
+
+// ST7735 took the colour order in its constructor; the others hardcode a bit
+// in MADCTL, so re-send the register whenever our choice differs from theirs.
+void LB_Display::applyColorOrder() {
+  if (_panel->driver == LB_DRV_ST7735) return;  // handled at construction
+  const bool want = colorOrderIsBGR();
+  const bool driverDefault = (_panel->driver == LB_DRV_ST7796);  // others: RGB
+  if (want == driverDefault) { _madctlOverride = false; return; }
+  _madctlOverride = true;
+  _bus->beginWrite();
+  _bus->writeC8D8(0x36, lb_madctl(_panel->driver, rotation(), want));
+  _bus->endWrite();
 }
 
 void LB_Display::setWiring(const LB_Wiring &wiring) {
@@ -86,6 +153,9 @@ bool LB_Display::begin(bool useCanvas) {
     _gfx = _driver;
   }
 
+  applyColorOrder();
+  setInverted(_panel->invert);
+
   backlightBegin();
   backlight(255);
   return true;
@@ -100,7 +170,15 @@ void LB_Display::flush() {
 }
 
 void LB_Display::setRotation(uint8_t r) {
-  if (_gfx) _gfx->setRotation(r & 3);
+  if (!_gfx) return;
+  _gfx->setRotation(r & 3);
+  // The driver just rewrote MADCTL from its own idea of the colour order, so
+  // ours has to go back on top.
+  if (_madctlOverride) {
+    _bus->beginWrite();
+    _bus->writeC8D8(0x36, lb_madctl(_panel->driver, r & 3, colorOrderIsBGR()));
+    _bus->endWrite();
+  }
 }
 
 // ─── Backlight ───────────────────────────────────────────────────────────────
@@ -153,6 +231,11 @@ void LB_Display::printInfo(Print &out) const {
   out.printf("Pins       : CS=%d RST=%d DC=%d MOSI=%d SCLK=%d BL=%d\n",
              _wiring.cs, _wiring.rst, _wiring.dc,
              _wiring.mosi, _wiring.sclk, _wiring.backlight);
+  out.printf("Colour     : %s%s, %sinverted%s\n",
+             colorOrderIsBGR() ? "BGR" : "RGB",
+             _colorOrder == COLOR_AUTO ? "" : " (forced)",
+             _inverted ? "" : "not ",
+             _inverted == _panel->invert ? "" : " (forced)");
   out.printf("Framebuffer: %s\n", _canvas ? "yes (PSRAM canvas)" : "no (direct)");
   out.println(F("-------------------------------"));
 }

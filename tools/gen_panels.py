@@ -65,7 +65,6 @@ def gen_header(doc) -> str:
         "  uint16_t         width;       // native size at `rotation`",
         "  uint16_t         height;",
         "  uint8_t          rotation;    // the orientation the panel ships in",
-        "  bool             ips;",
         "  bool             bgr;",
         "  bool             invert;",
         "  bool             flipX;",
@@ -85,12 +84,12 @@ def gen_header(doc) -> str:
         off = p["offsets"]
         L.append(
             "  {{ \"{id}\", \"{name}\", LB_DRV_{drv}, {w}, {h}, {rot}, "
-            "{ips}, {bgr}, {inv}, {fx}, {fy}, "
+            "{bgr}, {inv}, {fx}, {fy}, "
             "{o0}, {o1}, {o2}, {o3}, {hz}, "
             "{bla}, {ops} }},".format(
                 id=p["id"], name=p["name"], drv=p["driver"],
                 w=p["width"], h=p["height"], rot=p["rotation"],
-                ips=cbool(p["ips"]), bgr=cbool(p.get("bgr")),
+                bgr=cbool(p.get("bgr")),
                 inv=cbool(p.get("invert")), fx=cbool(p.get("flip_x")),
                 fy=cbool(p.get("flip_y")),
                 o0=off[0], o1=off[1], o2=off[2], o3=off[3],

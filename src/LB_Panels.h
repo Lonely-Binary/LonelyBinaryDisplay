@@ -21,7 +21,6 @@ struct LB_PanelDef {
   uint16_t         width;       // native size at `rotation`
   uint16_t         height;
   uint8_t          rotation;    // the orientation the panel ships in
-  bool             ips;
   bool             bgr;
   bool             invert;
   bool             flipX;
@@ -36,17 +35,17 @@ struct LB_PanelDef {
 };
 
 static const LB_PanelDef LB_PANELS[] = {
-  { "tft_096", "0.96 inch", LB_DRV_ST7735, 80, 160, 0, false, true, false, false, false, 24, 0, 24, 0, 20000000, true, LB_INIT_NONE },
-  { "tft_18", "1.8 inch", LB_DRV_ST7735, 128, 160, 0, true, false, true, true, true, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE },
-  { "tft_20", "2.0 inch", LB_DRV_ST7789, 240, 320, 0, true, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
-  { "tft_24", "2.4 inch", LB_DRV_ST7789, 240, 320, 0, true, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
-  { "tft_28", "2.8 inch", LB_DRV_ST7789, 240, 320, 0, true, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
-  { "tft_35", "3.5 inch", LB_DRV_ST7796, 320, 480, 0, true, true, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
-  { "narrow_114", "1.14 inch", LB_DRV_ST7789, 135, 240, 1, true, false, true, false, false, 52, 40, 53, 40, 8000000, true, LB_INIT_NONE },
-  { "narrow_168", "1.68 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, false, 12, 0, 14, 0, 8000000, true, LB_INIT_NONE },
-  { "narrow_19", "1.9 inch", LB_DRV_ST7789, 170, 320, 1, true, false, true, false, false, 35, 0, 35, 0, 8000000, true, LB_INIT_NONE },
-  { "narrow_225", "2.25 inch", LB_DRV_ST7789, 76, 284, 1, false, false, false, false, false, 82, 18, 82, 18, 8000000, true, LB_INIT_NONE },
-  { "narrow_279", "2.79 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, false, 12, 0, 14, 0, 20000000, true, LB_INIT_NV3007_279 },
+  { "tft_096", "0.96 inch", LB_DRV_ST7735, 80, 160, 0, true, false, false, false, 24, 0, 24, 0, 20000000, true, LB_INIT_NONE },
+  { "tft_18", "1.8 inch", LB_DRV_ST7735, 128, 160, 0, false, false, true, true, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE },
+  { "tft_20", "2.0 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
+  { "tft_24", "2.4 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
+  { "tft_28", "2.8 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
+  { "tft_35", "3.5 inch", LB_DRV_ST7796, 320, 480, 0, true, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
+  { "narrow_114", "1.14 inch", LB_DRV_ST7789, 135, 240, 1, false, true, false, false, 52, 40, 53, 40, 8000000, true, LB_INIT_NONE },
+  { "narrow_168", "1.68 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 8000000, true, LB_INIT_NONE },
+  { "narrow_19", "1.9 inch", LB_DRV_ST7789, 170, 320, 1, false, true, false, false, 35, 0, 35, 0, 8000000, true, LB_INIT_NONE },
+  { "narrow_225", "2.25 inch", LB_DRV_ST7789, 76, 284, 1, false, false, false, false, 82, 18, 82, 18, 8000000, true, LB_INIT_NONE },
+  { "narrow_279", "2.79 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 20000000, true, LB_INIT_NV3007_279 },
 };
 
 #define LB_PANEL_COUNT 11
