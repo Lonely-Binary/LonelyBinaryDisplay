@@ -108,6 +108,54 @@ makes a wiring mistake obvious in the serial log.
 
 See **File ▸ Examples ▸ Lonely Binary Display ▸ CustomPins**.
 
+### When the colours come out wrong
+
+The panel table already carries the right colour order and inversion for every
+screen we sell, so you should never need this. You will need it for a bare
+panel bought elsewhere, or if a new batch of glass is wired differently from
+the one we characterised.
+
+**Diagnose it first.** Fill the screen with pure red, then green, then blue,
+and leave a black bar somewhere. Then read the symptom off this table:
+
+| What you see | What is wrong | Fix |
+|---|---|---|
+| Red shows **blue**, blue shows **red**, black is still black | Colour order | `setColorOrder()` |
+| Everything looks like a photo negative — black comes out white | Inversion | `setInverted()` |
+| Red → **yellow**, green → **magenta**, blue → **cyan** | **Both** | both calls |
+
+That third row is the confusing one, so it is worth knowing on sight: it is not
+some exotic third failure, it is simply inversion *and* a channel swap stacked
+on top of each other. Invert red and you get cyan; swap cyan's channels and you
+get yellow.
+
+```cpp
+LB_Display display(LB_TFT_18);
+
+void setup() {
+  // Colour order is fixed when the driver is constructed, so this one has to
+  // come BEFORE begin(). COLOR_AUTO (the default) uses the panel table.
+  display.setColorOrder(LB_Display::COLOR_BGR);
+
+  display.begin();
+
+  // Inversion is a live register write, so it can be changed at any time —
+  // which makes it the one to sweep in a test sketch.
+  display.setInverted(true);
+}
+```
+
+`printInfo()` reports both, and marks either as `(forced)` when you have
+overridden the table:
+
+```
+Colour     : BGR (forced), inverted (forced)
+```
+
+If you find a wrong value for a panel **we sell**, please tell us rather than
+working around it in your sketch — it belongs in `panels.yaml`, where both the
+Arduino and MicroPython sides pick it up.
+
 ### Always write `auto *gfx`
 
 On a TFT, `gfx()` returns an `Arduino_GFX`. On an e-paper panel it returns a
@@ -126,6 +174,8 @@ the day you plug in an e-paper module.
 | `backlight(0..255)` | PWM on every panel. Active-high vs active-low is decided by the panel table, not by you. |
 | `setWiring(pins)` | Your own GPIOs. Before `begin()`. |
 | `setSpiHz(hz)` | Override the panel's SPI clock. Before `begin()`; `0` restores the default. |
+| `setColorOrder(order)` | `COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Before `begin()`. |
+| `setInverted(bool)` | Flip the panel's inversion. Any time. |
 | `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. |
 | `width()` / `height()` | Current size, rotation included. |
 | `selfTest()` | Colour bars, backlight sweep, panel identity. |
@@ -157,6 +207,15 @@ d.backlight(255)
 tft = d.gfx()
 tft.fill(BLACK)
 tft.text("Hello", 10, 10, WHITE, scale=2)
+```
+
+Colour order and inversion live on the panel, so override them by copying it:
+
+```python
+panel = dict(TFT_24)
+panel["bgr"] = True             # red and blue swapped
+panel["invert"] = False         # black coming out white
+d = LBDisplay(panel)
 ```
 
 Your own wiring, same rule — copy the default, change what differs:
