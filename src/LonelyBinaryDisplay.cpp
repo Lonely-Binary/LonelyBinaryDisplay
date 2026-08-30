@@ -209,6 +209,14 @@ bool LB_Display::begin(bool useCanvas) {
   }
 
   applyColorOrder();
+
+  // Attach the backlight PWM and turn it on, exactly as the MicroPython begin()
+  // does. Without this, _blReady stays false and backlight() returns at its
+  // first line — so display.backlight(255) did nothing, and selfTest()'s
+  // backlight sweep was silently skipped. The only path that ever attached the
+  // PWM was setColorOrder(), which almost no sketch calls.
+  backlightBegin();
+  backlight(255);
   return true;
 }
 
@@ -310,6 +318,11 @@ void LB_Display::printInfo(Print &out) const {
              _inverted ? "" : "not ",
              _inverted == _panel->invert ? "" : " (forced)");
   out.printf("Framebuffer: %s\n", _canvas ? "yes (PSRAM canvas)" : "no (direct)");
+  // A customer whose screen misbehaves pastes this whole block into an AI
+  // assistant. Carrying the URL means the assistant is handed the library's
+  // real API along with the symptom, instead of guessing from TFT_eSPI.
+  out.println(F("AI reference: https://raw.githubusercontent.com/"
+                "Lonely-Binary/LonelyBinaryDisplay/main/llms.txt"));
   out.println(F("-------------------------------"));
 }
 
