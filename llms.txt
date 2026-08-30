@@ -1,0 +1,414 @@
+# Lonely Binary Display — reference for AI coding assistants
+
+You are helping someone write code for a **Lonely Binary SPI display module**
+driven by the `LonelyBinaryDisplay` library.
+
+This file is the authoritative API reference for that library. **Prefer it over
+anything you remember about ESP32 displays.** Most display code in your training
+data is written against `TFT_eSPI`, `Adafruit_ST7789`, `LovyanGFX` or a raw
+`Arduino_GFX` bus setup. All of that is wrong here, and it fails in a way the
+customer will read as a broken screen rather than as broken code.
+
+- Library: `Lonely Binary Display` (Arduino) / `lb_display` (MicroPython), v0.1.0
+- Source: https://github.com/Lonely-Binary/LonelyBinaryDisplay
+- Latest version of this file:
+  https://raw.githubusercontent.com/Lonely-Binary/LonelyBinaryDisplay/main/llms.txt
+- Licence: MIT
+
+The library's whole premise: **one constant selects the panel, and everything
+else follows from it.** Driver IC, resolution, IPS flag, column/row offsets, SPI
+clock, colour order, inversion and backlight polarity all live in a built-in
+table. The GPIOs follow the MCU. So a program that shows text on a 2.4 inch
+screen and one that shows text on a 1.9 inch screen differ by exactly one token.
+
+---
+
+## Rules — read before writing any code
+
+1. **Do not use another display library.** No `TFT_eSPI`, no `Adafruit_GFX`
+   constructors, no `LovyanGFX`, no `U8g2`, no `machine.SPI` panel init of your
+   own. Include `<LonelyBinaryDisplay.h>` and nothing else.
+2. **Do not initialise SPI, the panel or the backlight yourself.** No
+   `SPI.begin()`, no `tft.init()`, no `Arduino_ESP32SPI(...)`, no
+   `pinMode(BL, OUTPUT)`, no `analogWrite()` / `ledcAttach()` on the backlight.
+   `display.begin()` does all of it.
+3. **Always write `auto *gfx = display.gfx();`** — never `Arduino_GFX *gfx`.
+   See "Why `auto`" below. This is a rule, not a style preference.
+4. **Only pass the panel constant to the constructor.** Never a width, height,
+   driver name, offset or SPI speed. `LB_Display display(LB_TFT_24);` is the
+   entire configuration.
+5. **Only use panel constants that appear in the table below.** If the customer
+   names a size that is not there, say so — do not invent `LB_TFT_32`.
+6. **Never hard-code the resolution.** Use `display.width()` and
+   `display.height()`. Several panels ship rotated, so their usable size is the
+   transpose of the glass size, and it changes again with `setRotation()`.
+7. **Custom wiring starts from the default**: `LB_Wiring pins = LB_WIRING;`,
+   then change only what differs. Never fill an `LB_Wiring` from scratch — the
+   `spiHost` field is a bus number whose meaning differs per chip.
+8. **`setWiring()`, `setSpiHz()`, and `setColorOrder()` on ST7735 must be called
+   before `begin()`.** Everything else works at any time.
+9. **ESP32 and ESP32-S3 only.** This library does not build for AVR (Uno, Nano),
+   RP2040, STM32 or ESP8266. If the customer names one of those, stop and say
+   so rather than producing code that cannot compile.
+10. **Do not mix the two language APIs.** Arduino is C++ (`display.backlight(255)`,
+    `gfx->fillScreen(BLACK)`); MicroPython is Python (`d.backlight(255)`,
+    `tft.fill(BLACK)`). Decide which one the customer is on before writing a
+    line — ask if it is not obvious.
+
+### Mapping what the customer says to a constant
+
+Customers describe their screen by the size printed on it: "my 2.8 inch screen",
+"the 1.9 inch one". Map that straight to the constant in the table below. There
+is exactly one entry per size, so the mapping is never ambiguous, and the driver
+IC never needs to be discussed. If a customer volunteers a controller name
+("it's an ST7789"), that is not enough to pick a panel — four different products
+use ST7789. Ask for the size.
+
+---
+
+## Hardware
+
+- **MCU:** ESP32-S3 or classic ESP32. In the Arduino IDE the customer picks the
+  board under **Tools ▸ Board**; the GPIOs follow that choice with no edits.
+- **Default wiring** (the Lonely Binary breakout — every panel in the range
+  shares one 15-pin FPC, so these depend on the MCU only, never on the panel):
+
+  | | CS | RST | DC | MOSI | SCLK | Backlight | SPI bus |
+  |---|---|---|---|---|---|---|---|
+  | ESP32-S3 | 10 | 42 | 2 | 11 | 12 | 41 | HSPI / `SPI(1)` |
+  | classic ESP32 | 15 | 4 | 2 | 23 | 18 | 32 | VSPI / `SPI(2)` |
+
+  MISO is unused. A framebuffer (`begin(true)`) needs PSRAM, which the S3 board
+  has and the classic ESP32 board does not.
+
+---
+
+## Panel constants
+
+<!-- BEGIN GENERATED PANEL TABLE — panels.yaml via tools/gen_panels.py -->
+
+### Panels Lonely Binary sells
+
+Pick by the size printed on the display. That is the whole decision, and
+there is never more than one entry for a size. Everything else in this
+table follows from the constant — do not pass any of it to the library by
+hand.
+
+| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | SPI clock | Backlight |
+|---|---|---|---|---|---|---|
+| 0.96 inch | `LB_TFT_096` | `TFT_096` | 80 x 160 | ST7735 | 20 MHz | active low |
+| 1.8 inch | `LB_TFT_18` | `TFT_18` | 128 x 160 | ST7735 | 20 MHz | active high |
+| 2.0 inch | `LB_TFT_20` | `TFT_20` | 240 x 320 | ST7789 | 40 MHz | active high |
+| 2.4 inch | `LB_TFT_24` | `TFT_24` | 240 x 320 | ST7789 | 40 MHz | active high |
+| 2.8 inch | `LB_TFT_28` | `TFT_28` | 240 x 320 | ST7789 | 40 MHz | active high |
+| 3.5 inch | `LB_TFT_35` | `TFT_35` | 320 x 480 | ST7796 | 40 MHz | active high |
+| 1.14 inch | `LB_NARROW_114` | `NARROW_114` | 240 x 135 | ST7789 | 8 MHz | active low |
+| 1.68 inch | `LB_NARROW_168` | `NARROW_168` | 428 x 142 | NV3007 | 8 MHz | active low |
+| 1.9 inch | `LB_NARROW_19` | `NARROW_19` | 320 x 170 | ST7789 | 8 MHz | active low |
+| 2.25 inch | `LB_NARROW_225` | `NARROW_225` | 284 x 76 | ST7789 | 8 MHz | active low |
+| 2.79 inch | `LB_NARROW_279` | `NARROW_279` | 428 x 142 | NV3007 | 20 MHz | active low |
+
+**Screen size is the size after the panel's default rotation**, which is
+what `width()` / `height()` return and what you should lay a UI out
+against. These ship rotated (landscape), so their size here is the
+transpose of the raw glass:
+
+- `LB_NARROW_114` — glass is 135 x 240, ships at rotation 1, so you get 240 x 135
+- `LB_NARROW_168` — glass is 142 x 428, ships at rotation 1, so you get 428 x 142
+- `LB_NARROW_19` — glass is 170 x 320, ships at rotation 1, so you get 320 x 170
+- `LB_NARROW_225` — glass is 76 x 284, ships at rotation 1, so you get 284 x 76
+- `LB_NARROW_279` — glass is 142 x 428, ships at rotation 1, so you get 428 x 142
+
+### Panels the library can drive but Lonely Binary does not sell
+
+**If the customer bought a display from Lonely Binary, it is in the table
+above and this one is irrelevant.** These are named by controller and
+resolution rather than by size, precisely so they cannot be mistaken for a
+product. Values are measured on one sample; another sample of the same
+controller may well need `setColorOrder()` / `setInverted()` /
+`setBacklightActiveLow()`.
+
+| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | SPI clock | Backlight |
+|---|---|---|---|---|---|---|
+| ILI9341 | `LB_ILI9341_240X320` | not supported | 240 x 320 | ILI9341 | 40 MHz | active high |
+
+<!-- END GENERATED PANEL TABLE -->
+
+---
+
+## Arduino / C++
+
+### Install
+
+Library Manager ▸ **Lonely Binary Display**. It depends on **GFX Library for
+Arduino** (moononournation), which Library Manager pulls in automatically.
+Examples land under **File ▸ Examples ▸ Lonely Binary Display**.
+
+### Minimal program
+
+```cpp
+#include <LonelyBinaryDisplay.h>
+
+LB_Display display(LB_TFT_24);      // the only line that changes per panel
+
+void setup() {
+  Serial.begin(115200);
+
+  if (!display.begin()) {
+    Serial.println("Display did not start — check the ribbon cable and DC.");
+    return;
+  }
+  display.backlight(255);
+
+  auto *gfx = display.gfx();        // auto, always
+  gfx->fillScreen(BLACK);
+  gfx->setTextColor(WHITE);
+  gfx->setTextSize(2);
+  gfx->setCursor(10, 10);
+  gfx->print("Hello");
+}
+
+void loop() {}
+```
+
+### Why `auto`
+
+`gfx()` is declared as returning `Arduino_GFX *`, so writing that type out
+compiles today and you will be tempted to. Don't. On an e-paper panel `gfx()`
+returns a `GxEPD2_GFX`, which shares **no base class** with `Arduino_GFX` — the
+two only agree on method names. Code written with `auto` compiles against both;
+code with the type spelled out forks the day the customer plugs in e-paper.
+
+### API
+
+| Call | Notes |
+|---|---|
+| `LB_Display display(LB_TFT_24)` | The panel constant is the entire configuration. |
+| `begin(bool useCanvas = false)` | Brings up SPI, the panel and the backlight PWM, and turns the backlight on. Returns `false` only if the panel driver refuses to start — almost always a wiring fault, DC first. |
+| `gfx()` | The drawing surface. Assign to `auto *`. |
+| `backlight(0..255)` | PWM on every panel. Active-high vs active-low comes from the panel table; the sketch never needs to know which. |
+| `flush()` | Pushes the framebuffer. No-op without a canvas, so always safe to call. |
+| `hasCanvas()` | Whether `begin(true)` actually got a framebuffer. |
+| `framebuffer()` | The raw RGB565 buffer, or `nullptr`. LVGL renders straight into this. |
+| `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. |
+| `rotation()`, `width()`, `height()` | Current state, rotation included. |
+| `setWiring(pins)` | Your own GPIOs. **Before `begin()`.** |
+| `setSpiHz(hz)` | Override the panel's SPI clock. **Before `begin()`**; `0` restores the default. |
+| `setColorOrder(order)` | `LB_Display::COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time, **except on ST7735 where it must precede `begin()`**. Returns `false` if it could not be applied. |
+| `setInverted(bool)` | Flip the panel's inversion. Any time. |
+| `setBacklightActiveLow(bool)` | Flip the backlight polarity. Any time. |
+| `panel()` | The panel table entry — `->name`, `->id`, `->width`, `->height`. |
+| `selfTest()` | Colour bars, backlight sweep, panel identity. The "does my wiring work" check. |
+| `printInfo()` | The same details to Serial. Ask for this output when diagnosing. |
+
+Drawing itself is the **Arduino_GFX** API (Adafruit_GFX-compatible names):
+`fillScreen`, `fillRect`, `drawRect`, `drawLine`, `drawCircle`, `fillCircle`,
+`drawPixel`, `setCursor`, `setTextColor`, `setTextSize`, `setFont`, `print`,
+`println`, `printf`, `drawBitmap`, `draw16bitRGBBitmap`.
+
+### Colours
+
+`BLACK WHITE RED GREEN BLUE YELLOW MAGENTA CYAN ORANGE LIME` are available
+unprefixed. GFX Library 1.6.5 renamed these to `RGB565_*`; the compatibility
+shim lives in the library so sketches did not have to change.
+
+`LB_BLACK`, `LB_RED`, … `LB_GREY` are always available and never collide — use
+these if the sketch defines its own colour names. Define `LB_NO_LEGACY_COLORS`
+before the include to suppress the bare names. For anything else:
+`gfx->color565(r, g, b)`.
+
+### Recipe: a value that updates without flicker
+
+The naive loop — clear the screen, redraw the number — flickers badly. Two ways
+to avoid it, in order of preference:
+
+```cpp
+// 1. Opaque text: a two-argument setTextColor() paints the background with
+//    each glyph, so the old digits are overwritten rather than cleared.
+//    Pad to a fixed width or "9" will leave the "0" of a previous "10" behind.
+void loop() {
+  auto *gfx = display.gfx();
+  gfx->setTextColor(WHITE, BLACK);
+  gfx->setTextSize(3);
+  gfx->setCursor(10, 40);
+  gfx->printf("%5.1f C", readTemperature());
+  delay(500);
+}
+```
+
+```cpp
+// 2. A framebuffer: draw the whole screen freely, then push it in one go.
+//    Needs PSRAM (ESP32-S3). If the allocation fails the library says so on
+//    Serial and draws direct instead, so begin(true) is always safe to ask for
+//    — check hasCanvas() if the difference matters to you.
+void setup() {
+  display.begin(true);
+  display.backlight(255);
+}
+
+void loop() {
+  auto *gfx = display.gfx();
+  gfx->fillScreen(BLACK);
+  gfx->setCursor(10, 40);
+  gfx->print(readTemperature());
+  display.flush();          // nothing appears until this call
+  delay(500);
+}
+```
+
+With a canvas, **`setRotation()` cannot switch between portrait and landscape** —
+the framebuffer was allocated the other way round, so the library refuses and
+logs to Serial. Set the rotation before `begin(true)`, or use `begin()` without
+a canvas.
+
+### Recipe: the customer's own wiring
+
+```cpp
+LB_Display display(LB_TFT_24);      // the panel constant does NOT change
+
+void setup() {
+  LB_Wiring pins = LB_WIRING;       // start from the kit wiring for this board
+  pins.cs        = 5;               // ...change only what differs
+  pins.dc        = 16;
+  pins.rst       = 17;
+  pins.backlight = 4;               // or -1 for no backlight pin
+
+  display.setWiring(pins);          // must precede begin()
+  display.begin();
+  display.printInfo();              // marks the pins as custom — catches typos
+}
+```
+
+Driver IC, resolution, offsets, colour order and backlight polarity belong to
+the **screen**; only the GPIOs belong to the board. So the panel constant stays.
+
+Long ribbon extensions or jumper wires sometimes will not take the panel's rated
+clock — a scrambled or half-drawn image is the symptom:
+
+```cpp
+display.setSpiHz(20000000);         // before begin(); 0 restores the default
+```
+
+---
+
+## MicroPython
+
+Runs on **stock MicroPython** from micropython.org — no custom firmware build.
+
+```bash
+mpremote mip install github:Lonely-Binary/LonelyBinaryDisplay/micropython
+```
+
+```python
+from lb_display import LBDisplay, BLACK, WHITE
+from lb_panels import TFT_24          # the only line that changes per panel
+
+d = LBDisplay(TFT_24)
+d.begin()                             # also enables the backlight at full
+d.backlight(255)
+
+tft = d.gfx()
+tft.fill(BLACK)
+tft.text("Hello", 10, 10, WHITE, scale=2)
+```
+
+### API
+
+`LBDisplay(panel, wiring=None, board=None)`, then `begin()`, `gfx()`,
+`backlight(0..255)`, `set_rotation(0..3)`, `width()`, `height()`, `self_test()`,
+`print_info()`. `detect_board()` returns `"esp32s3"` or `"esp32"`.
+
+Drawing, on the object from `gfx()`:
+`fill(color)`, `fill_rect(x, y, w, h, color)`, `rect(...)`, `pixel(x, y, color)`,
+`hline(x, y, w, color)`, `vline(x, y, h, color)`, `line(x0, y0, x1, y1, color)`,
+`circle(cx, cy, r, color)`, `fill_circle(...)`, `fill_triangle(...)`,
+`blit(buf, x, y, w, h)`, and
+`text(s, x, y, color, bg=BLACK, scale=1)`.
+
+Note that `text()` **always paints a background** — it defaults to `BLACK`, so
+drawing a label on a coloured fill needs the `bg=` argument to match, or it
+appears in a black box. There is no cursor and no `print()`; every call takes
+explicit coordinates.
+
+Colours are `BLACK WHITE RED GREEN BLUE YELLOW MAGENTA CYAN` — importable from
+`lb_display`. There is no `ORANGE`, `LIME` or `GREY` here; use
+`st77xx.color565(r, g, b)`.
+
+### Differences from the Arduino side
+
+- **No framebuffer.** There is no `begin(True)`, no `flush()`, no canvas. Avoid
+  flicker by redrawing only the region that changed (`fill_rect` over the old
+  value, then `text`), not by clearing the screen each frame.
+- **No colour-order or inversion setters.** Those live on the panel dict, so
+  override them by copying it:
+
+  ```python
+  panel = dict(TFT_24)
+  panel["bgr"] = True            # red and blue swapped
+  panel["invert"] = False        # black coming out white
+  d = LBDisplay(panel)
+  ```
+
+- **Custom wiring is a dict**, copied from the default for the same reason the
+  C++ side copies `LB_WIRING` — the SPI bus id differs between the chips:
+
+  ```python
+  import lb_panels
+  from lb_display import LBDisplay, detect_board
+  from lb_panels import TFT_24
+
+  pins = dict(lb_panels.WIRING[detect_board()])
+  pins["cs"] = 5
+  pins["backlight"] = -1         # no backlight pin on this board
+  d = LBDisplay(TFT_24, wiring=pins)
+  d.begin()
+  ```
+
+- **`nv3007.py`** is imported only when a NV3007 panel is selected, so the other
+  panels do not need that file on the board.
+- Panel constants drop the `LB_` prefix: `TFT_24`, `NARROW_19`, …
+
+---
+
+## Troubleshooting
+
+Ask the customer for the output of `printInfo()` / `print_info()` first — it
+reports the panel, the pins actually in use, the colour order, the backlight
+polarity and whether a framebuffer was allocated, which settles most of these
+without guessing.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `begin()` returned false | Wiring — **DC first**, then RST and CS | Check the ribbon seating; `printInfo()` lists the pins in use |
+| Nothing on screen, backlight is on | Drawing to a canvas and never pushing it | Call `display.flush()` |
+| Screen dark at `backlight(255)`, bright at `backlight(0)` | Backlight polarity is backwards | `setBacklightActiveLow()` — and report it, it belongs in the panel table |
+| Red shows blue, blue shows red, black is still black | Colour order | `setColorOrder(LB_Display::COLOR_BGR)` (or `COLOR_RGB`) |
+| Photo-negative — black comes out white | Inversion | `setInverted(true)` (or `false`) |
+| Red → yellow, green → magenta, blue → cyan | **Both** of the above stacked | Both calls |
+| Scrambled, torn or half-drawn image | SPI clock too high for the wiring | `setSpiHz(20000000)` before `begin()` |
+| Image drawn into a corner or shifted by a few pixels | Offsets — usually a hand-written driver setup, or a non-Lonely-Binary panel | Use the panel constant; for a foreign panel the offsets cannot be guessed |
+| UI laid out off the right edge | Hard-coded resolution on a panel that ships rotated | Use `width()` / `height()` |
+| `setRotation()` did nothing, message on Serial | Portrait↔landscape with a canvas allocated | Set rotation before `begin(true)` |
+
+For a panel Lonely Binary **sells**, a wrong colour order, inversion or
+backlight polarity is a bug in the library's panel table, not something to work
+around in the sketch. Please report it — the fix belongs in `panels.yaml`, where
+both language bindings pick it up.
+
+---
+
+## What this library does not do
+
+Say so plainly rather than improvising — each of these is a real boundary, not a
+gap to paper over:
+
+- **Touch.** No touch controller support of any kind.
+- **Images and fonts from an SD card / SPIFFS.** Not provided; JPEG or PNG
+  decoding is the sketch's own business.
+- **LVGL setup.** The library gets on well with LVGL — `begin(true)` gives you
+  the framebuffer LVGL wants, and `framebuffer()` lets its flush callback be a
+  no-op — but the LVGL glue itself lives in a separate Lonely Binary library.
+- **Non-ESP32 targets.** See rule 9.
+- **Panels bought elsewhere.** Only `LB_ILI9341_240X320` is characterised at
+  all, on a single sample. Expect to reach for the colour-order, inversion,
+  backlight-polarity and SPI-clock overrides.

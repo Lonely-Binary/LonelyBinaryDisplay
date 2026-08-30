@@ -7,9 +7,17 @@ Generate the C++ and MicroPython panel tables from panels.yaml.
 
 panels.yaml is the single source of truth. The two generated files must never
 be hand-edited — this script overwrites them.
+
+llms.txt (the file customers paste into an AI assistant) is a third consumer.
+Only its panel table is generated, spliced between two markers; the prose
+around them is hand-written. It is generated for the same reason the bindings
+are: llms.txt is the only document most customers will ever put in front of an
+AI, so a panel table that quietly goes stale there is worse than one that goes
+stale in a header — the compiler never sees it.
 """
 import argparse
 import pathlib
+import re
 import sys
 
 try:
@@ -22,8 +30,16 @@ SRC = ROOT / "panels.yaml"
 OUT_H = ROOT / "src" / "LB_Panels.h"
 OUT_WIRING = ROOT / "src" / "LB_Wiring.h"
 OUT_PY = ROOT / "micropython" / "lb_panels.py"
+OUT_LLMS = ROOT / "llms.txt"
+
+# The MicroPython driver modules, scanned for the classes they actually define
+# so llms.txt can never claim MicroPython support that does not exist.
+MP_MODULES = [ROOT / "micropython" / "st77xx.py", ROOT / "micropython" / "nv3007.py"]
 
 BANNER = "GENERATED FROM panels.yaml BY tools/gen_panels.py — DO NOT EDIT"
+
+LLMS_BEGIN = "<!-- BEGIN GENERATED PANEL TABLE — panels.yaml via tools/gen_panels.py -->"
+LLMS_END = "<!-- END GENERATED PANEL TABLE -->"
 
 DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341"]
 INIT_OPS = {None: "LB_INIT_NONE", "nv3007_279": "LB_INIT_NV3007_279"}
@@ -33,6 +49,31 @@ def const_name(panel) -> str:
     """tft_24 -> LB_TFT_24. An explicit `const:` wins, so an id can stay precise
     for device_info while the name a sketch uses stays short."""
     return panel.get("const") or ("LB_" + panel["id"].upper())
+
+
+def mp_name(panel) -> str:
+    """LB_TFT_24 -> TFT_24. MicroPython drops the prefix; C has no namespaces
+    and Python does."""
+    return const_name(panel)[3:]
+
+
+def mp_cls(panel) -> str:
+    """The MicroPython driver class a panel asks for. The two NV3007 panels are
+    the same silicon with different init tables, so they are separate classes
+    there rather than a runtime flag."""
+    if panel["driver"] == "NV3007":
+        return "NV3007_279" if panel.get("init_ops") == "nv3007_279" else "NV3007_168"
+    return panel["driver"]
+
+
+def mp_classes() -> set:
+    """The classes the MicroPython drivers really define. Read from the source
+    rather than listed here, so a panel whose driver was only ever written for
+    Arduino is reported as unsupported instead of silently promised."""
+    found = set()
+    for path in MP_MODULES:
+        found |= set(re.findall(r"^class (\w+)", path.read_text(), re.M))
+    return found
 
 
 def cbool(v) -> str:
@@ -190,11 +231,9 @@ def gen_python(doc) -> str:
     for p in panels:
         off = p["offsets"]
         xs, ys = (off[2], off[3]) if p["rotation"] % 2 else (off[0], off[1])
-        name = (p.get("const") or ("LB_" + p["id"].upper()))[3:]
+        name = mp_name(p)
         names.append(name)
-        cls = p["driver"]
-        if p["driver"] == "NV3007":
-            cls = "NV3007_279" if p.get("init_ops") == "nv3007_279" else "NV3007_168"
+        cls = mp_cls(p)
         L += [
             f"{name} = {{",
             f'    "id": "{p["id"]}",',
@@ -224,6 +263,94 @@ def gen_python(doc) -> str:
     return "\n".join(L)
 
 
+# ── llms.txt (the AI-facing panel table) ─────────────────────────────────────
+
+def mhz(hz: int) -> str:
+    return f"{hz / 1_000_000:g} MHz"
+
+
+def screen_size(panel) -> str:
+    """What the sketch actually gets. A panel that ships at rotation 1 reports
+    its axes swapped, so quoting the native size here would have an AI laying
+    out a 170-pixel-wide UI on a 320-pixel-wide screen."""
+    w, h = panel["width"], panel["height"]
+    return f"{h} x {w}" if panel["rotation"] % 2 else f"{w} x {h}"
+
+
+def gen_llms_panels(doc) -> str:
+    panels = doc["panels"]
+    have = mp_classes()
+
+    def row(p, label):
+        cls = mp_cls(p)
+        mp = f"`{mp_name(p)}`" if cls in have else "not supported"
+        return (
+            f"| {label} | `{const_name(p)}` | {mp} | {screen_size(p)} | "
+            f"{p['driver']} | {mhz(p['spi_hz'])} | "
+            f"{'active low' if p['backlight_active_low'] else 'active high'} |"
+        )
+
+    head = [
+        "| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | SPI clock | Backlight |",
+        "|---|---|---|---|---|---|---|",
+    ]
+
+    products = [p for p in panels if p.get("product", True)]
+    others = [p for p in panels if not p.get("product", True)]
+
+    L = [
+        "### Panels Lonely Binary sells",
+        "",
+        "Pick by the size printed on the display. That is the whole decision, and",
+        "there is never more than one entry for a size. Everything else in this",
+        "table follows from the constant — do not pass any of it to the library by",
+        "hand.",
+        "",
+    ] + head + [row(p, p["name"]) for p in products]
+
+    rotated = [p for p in panels if p["rotation"] % 2]
+    if rotated:
+        L += [
+            "",
+            "**Screen size is the size after the panel's default rotation**, which is",
+            "what `width()` / `height()` return and what you should lay a UI out",
+            "against. These ship rotated (landscape), so their size here is the",
+            "transpose of the raw glass:",
+            "",
+        ]
+        L += [
+            f"- `{const_name(p)}` — glass is {p['width']} x {p['height']}, "
+            f"ships at rotation {p['rotation']}, so you get {screen_size(p)}"
+            for p in rotated
+        ]
+
+    if others:
+        L += [
+            "",
+            "### Panels the library can drive but Lonely Binary does not sell",
+            "",
+            "**If the customer bought a display from Lonely Binary, it is in the table",
+            "above and this one is irrelevant.** These are named by controller and",
+            "resolution rather than by size, precisely so they cannot be mistaken for a",
+            "product. Values are measured on one sample; another sample of the same",
+            "controller may well need `setColorOrder()` / `setInverted()` /",
+            "`setBacklightActiveLow()`.",
+            "",
+        ] + head + [row(p, p["driver"]) for p in others]
+
+    return "\n".join(L)
+
+
+def gen_llms(doc, current: str) -> str:
+    """Splice the panel table into the hand-written llms.txt."""
+    start, end = current.find(LLMS_BEGIN), current.find(LLMS_END)
+    if start < 0 or end < 0:
+        sys.exit(f"{OUT_LLMS.name} is missing the generated-panel-table markers")
+    return (current[:start + len(LLMS_BEGIN)]
+            + "\n\n" + gen_llms_panels(doc) + "\n\n"
+            + current[end:])
+
+
 # ── Driver ───────────────────────────────────────────────────────────────────
 
 def main() -> int:
@@ -233,10 +360,13 @@ def main() -> int:
     args = ap.parse_args()
 
     doc = yaml.safe_load(SRC.read_text())
+    if not OUT_LLMS.exists():
+        sys.exit(f"{OUT_LLMS.name} is missing — it is hand-written, not generated")
     outputs = {
         OUT_H: gen_header(doc),
         OUT_WIRING: gen_wiring(doc),
         OUT_PY: gen_python(doc),
+        OUT_LLMS: gen_llms(doc, OUT_LLMS.read_text()),
     }
 
     stale = []
