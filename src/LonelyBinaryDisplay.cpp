@@ -209,6 +209,14 @@ bool LB_Display::begin(bool useCanvas) {
   }
 
   applyColorOrder();
+
+  // Attach the backlight PWM and turn it on, exactly as the MicroPython begin()
+  // does. Without this, _blReady stays false and backlight() returns at its
+  // first line — so display.backlight(255) did nothing, and selfTest()'s
+  // backlight sweep was silently skipped. The only path that ever attached the
+  // PWM was setColorOrder(), which almost no sketch calls.
+  backlightBegin();
+  backlight(255);
   return true;
 }
 
