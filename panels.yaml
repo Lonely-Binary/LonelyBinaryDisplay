@@ -280,16 +280,20 @@ panels:
     name: 'ILI9341 240x320'
     family: generic
     driver: ILI9341
-    width: 240
-    height: 320
+    width: 240          # verified 2026-08-30
+    height: 320         # verified 2026-08-30
     rotation: 0
-    offsets: [0, 0, 0, 0]
-    bgr: true
-    invert: false
+    offsets: [0, 0, 0, 0]   # verified: all four edges land on the glass
+    bgr: true           # verified 2026-08-30
+    invert: false       # verified 2026-08-30
     spi_hz: 40000000
-    backlight_active_low: false
+    backlight_active_low: false   # verified 2026-08-30
     notes: >-
-      EVERY VALUE HERE IS A GUESS and none of it has been near the panel. The
-      resolution is not even confirmed. Arduino_GFX's ILI9341 driver hardcodes
-      BGR in MADCTL and defaults to 240x320, which is where these came from.
-      Run internal/ILI9341/Bench before believing any of it.
+      Measured on one panel, 2026-08-30, on the classic-ESP32 bench rig. Every
+      value that was a guess turned out right: colour BGR and not inverted
+      (combo 1 of 4 was the correct card), rotation 0 upright at the stated
+      size, all four edge bars visible so the glass really is the full 240x320
+      of controller RAM and needs no offsets, and the backlight is active high.
+      STILL UNVERIFIED: the 40 MHz clock was never stress-tested, and only
+      rotation 0 was checked — 1, 2 and 3 are untried, and ILI9341 is the one
+      controller here with its own MADCTL rotation mapping.

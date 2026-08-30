@@ -289,11 +289,14 @@ they cannot be mistaken for a product:
 
 | Constant | Controller | Resolution | Status |
 |---|---|---|---|
-| `LB_ILI9341_240X320` | ILI9341 | 240 × 320 | **unverified — every value is a guess** |
+| `LB_ILI9341_240X320` | ILI9341 | 240 × 320 | measured on one panel; rotations 1–3 and the 40 MHz clock untried |
 
-Unverified means exactly that: nobody has run it. Expect to need
-[`setColorOrder()` / `setInverted()` / `setBacklightActiveLow()`](#when-the-colours-come-out-wrong)
-and quite possibly `setSpiHz()`. If you get one working, the numbers are
+Yours will not necessarily match. ILI9341 boards vary in colour order,
+inversion and backlight polarity, and the glass in front of the controller is
+sometimes smaller than its 240 × 320 of RAM, which needs offsets we cannot
+guess. Expect to reach for
+[`setColorOrder()` / `setInverted()` / `setBacklightActiveLow()`](#when-the-colours-come-out-wrong),
+and `setSpiHz()` if the image tears. If you get one working, the numbers are
 welcome.
 
 ---
