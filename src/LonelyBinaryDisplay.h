@@ -48,6 +48,32 @@ class LB_Display {
   explicit LB_Display(const LB_PanelDef *panel) : _panel(panel) {}
   ~LB_Display();
 
+  // ── Using your own wiring ────────────────────────────────────────────────
+  //
+  // By default the GPIOs come from LB_Wiring.h, which is the Lonely Binary
+  // breakout on the board you selected in Tools > Board. On your own PCB, or
+  // on a dev board where those pins are taken, start from that default and
+  // change only what differs — you inherit the SPI host that is correct for
+  // your MCU, which is worth having because the bus constants are not the same
+  // on an ESP32-S3 as on a classic ESP32 (VSPI does not even exist on the S3).
+  //
+  //     LB_Wiring pins = LB_WIRING;   // the kit wiring for this board
+  //     pins.cs = 5;                  // ...change what is different
+  //     pins.backlight = -1;          // -1 = this board has no backlight pin
+  //     display.setWiring(pins);
+  //     display.begin();
+  //
+  // Must be called before begin(); afterwards it does nothing.
+  void setWiring(const LB_Wiring &wiring);
+
+  // Override the panel table's SPI clock. Useful when your own wiring has
+  // longer traces or a ribbon extension and the default rate is marginal —
+  // symptoms are a scrambled or half-drawn image. Must be called before
+  // begin(); pass 0 to go back to the panel default.
+  void setSpiHz(int32_t hz) { _spiHzOverride = hz; }
+
+  const LB_Wiring &wiring() const { return _wiring; }
+
   // Bring up SPI, the panel and the backlight pin. Returns false if the panel
   // driver refuses to start (almost always a wiring fault — check DC first).
   //
@@ -97,6 +123,9 @@ class LB_Display {
 
  private:
   const LB_PanelDef *_panel;
+  LB_Wiring          _wiring = LB_WIRING;  // kit default until setWiring()
+  bool               _customWiring = false;
+  int32_t            _spiHzOverride = 0;
   Arduino_DataBus   *_bus    = nullptr;
   Arduino_GFX       *_driver = nullptr;  // the panel itself
   Arduino_Canvas    *_canvas = nullptr;  // framebuffer, when requested

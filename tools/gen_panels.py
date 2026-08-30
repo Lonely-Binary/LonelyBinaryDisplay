@@ -54,8 +54,6 @@ def gen_header(doc) -> str:
     L += [
         "};",
         "",
-        "enum LB_BacklightMode : uint8_t { LB_BL_ONOFF, LB_BL_PWM };",
-        "",
         "// Panels whose controller needs a vendor init table that differs from the",
         "// driver's built-in default (same silicon, different voltage/gamma).",
         "enum LB_InitOps : uint8_t { LB_INIT_NONE, LB_INIT_NV3007_279 };",
@@ -77,7 +75,6 @@ def gen_header(doc) -> str:
         "  int16_t          colOff2;     // applied at rotation 1 / 3",
         "  int16_t          rowOff2;",
         "  int32_t          spiHz;",
-        "  LB_BacklightMode blMode;",
         "  bool             blActiveLow; // LOW turns the backlight ON",
         "  LB_InitOps       initOps;",
         "};",
@@ -86,12 +83,11 @@ def gen_header(doc) -> str:
     ]
     for p in panels:
         off = p["offsets"]
-        bl = p["backlight"]
         L.append(
             "  {{ \"{id}\", \"{name}\", LB_DRV_{drv}, {w}, {h}, {rot}, "
             "{ips}, {bgr}, {inv}, {fx}, {fy}, "
             "{o0}, {o1}, {o2}, {o3}, {hz}, "
-            "{blm}, {bla}, {ops} }},".format(
+            "{bla}, {ops} }},".format(
                 id=p["id"], name=p["name"], drv=p["driver"],
                 w=p["width"], h=p["height"], rot=p["rotation"],
                 ips=cbool(p["ips"]), bgr=cbool(p.get("bgr")),
@@ -99,8 +95,7 @@ def gen_header(doc) -> str:
                 fy=cbool(p.get("flip_y")),
                 o0=off[0], o1=off[1], o2=off[2], o3=off[3],
                 hz=p["spi_hz"],
-                blm="LB_BL_PWM" if bl["mode"] == "pwm" else "LB_BL_ONOFF",
-                bla=cbool(bl["active_low"]),
+                bla=cbool(p["backlight_active_low"]),
                 ops=INIT_OPS[p.get("init_ops")],
             )
         )
@@ -198,8 +193,7 @@ def gen_python(doc) -> str:
             f'    "flip_x": {bool(p.get("flip_x"))},',
             f'    "flip_y": {bool(p.get("flip_y"))},',
             f'    "baudrate": {p["spi_hz"]},',
-            f'    "bl_pwm": {p["backlight"]["mode"] == "pwm"},',
-            f'    "bl_active_low": {bool(p["backlight"]["active_low"])},',
+            f'    "bl_active_low": {bool(p["backlight_active_low"])},',
             "}",
             "",
         ]

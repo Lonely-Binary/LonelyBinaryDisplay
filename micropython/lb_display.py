@@ -56,10 +56,27 @@ def detect_board():
 
 
 class LBDisplay:
-    def __init__(self, panel, board=None):
+    def __init__(self, panel, wiring=None, board=None):
+        """
+        panel  - a constant from lb_panels (TFT_24, NARROW_19, ...)
+        wiring - your own pins, when the display is not on the Lonely Binary
+                 breakout. Start from the default and change what differs:
+
+                     import lb_panels
+                     pins = dict(lb_panels.WIRING["esp32"])
+                     pins["cs"] = 5
+                     pins["backlight"] = -1      # no backlight pin
+                     d = LBDisplay(TFT_24, wiring=pins)
+
+                 Copying the default rather than writing a dict from scratch
+                 keeps the right spi_id for your chip - the SPI bus numbering
+                 is not the same on an ESP32-S3 as on a classic ESP32.
+        board  - force "esp32s3" or "esp32" instead of detecting the chip.
+        """
         self.panel = panel
         self.board = board or detect_board()
-        self.wiring = lb_panels.WIRING[self.board]
+        self.wiring = wiring or lb_panels.WIRING[self.board]
+        self.custom_wiring = wiring is not None
         self.tft = None
         self.spi = None
         self._pwm = None
@@ -101,23 +118,22 @@ class LBDisplay:
     # -- backlight -----------------------------------------------------------
 
     def _backlight_begin(self):
+        # Every panel in the range dims, so the backlight is always PWM.
+        # backlight(255) is simply full brightness.
         pin = self.wiring["backlight"]
-        if self.panel["bl_pwm"]:
+        if pin is not None and pin >= 0:
             self._pwm = PWM(Pin(pin), freq=5000)
-        else:
-            self._bl = Pin(pin, Pin.OUT)
 
     def backlight(self, level):
-        """0 = off, 255 = full. Active-low wiring and PWM vs on/off are decided
-        by the panel table, never by the caller - which is the whole point.
-        Getting this backwards is the classic 'why is my screen dark at 255'."""
+        """0 = off, 255 = full. Whether the panel is wired active-low is
+        decided by the panel table, never by the caller - which is the whole
+        point. Getting it backwards is the classic 'why is my screen dark at
+        255'."""
+        if self._pwm is None:
+            return
         level = max(0, min(255, int(level)))
-        if self._pwm is not None:
-            duty = 255 - level if self.panel["bl_active_low"] else level
-            self._pwm.duty_u16(duty * 257)
-        elif self._bl is not None:
-            on = 1 if level > 0 else 0
-            self._bl.value((1 - on) if self.panel["bl_active_low"] else on)
+        duty = 255 - level if self.panel["bl_active_low"] else level
+        self._pwm.duty_u16(duty * 257)
 
     # -- geometry ------------------------------------------------------------
 
@@ -140,10 +156,10 @@ class LBDisplay:
         print("Resolution : {}x{}  (native {}x{}, rotation {})".format(
             self.width(), self.height(), p["width"], p["height"], p["rotation"]))
         print("SPI clock  : {} Hz  (SPI{})".format(p["baudrate"], w["spi_id"]))
-        print("Backlight  : {}, active {}".format(
-            "PWM" if p["bl_pwm"] else "on/off",
+        print("Backlight  : PWM, active {}".format(
             "LOW" if p["bl_active_low"] else "HIGH"))
-        print("Board      : {}".format(self.board))
+        print("Board      : {}{}".format(
+            self.board, "  (custom wiring)" if self.custom_wiring else ""))
         print("Pins       : CS={} RST={} DC={} MOSI={} SCLK={} BL={}".format(
             w["cs"], w["rst"], w["dc"], w["mosi"], w["sclk"], w["backlight"]))
         print("-------------------------------")
@@ -159,7 +175,7 @@ class LBDisplay:
             t.text(name, 4, h // 2 - 8, WHITE, bg=color, scale=2)
             time.sleep_ms(700)
 
-        if self.panel["bl_pwm"]:
+        if self._pwm is not None:
             t.fill(WHITE)
             t.text("Backlight sweep", 4, 4, BLACK, bg=WHITE)
             for v in range(255, 29, -5):
