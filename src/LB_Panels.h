@@ -9,6 +9,7 @@ enum LB_Driver : uint8_t {
   LB_DRV_ST7796,
   LB_DRV_NV3007,
   LB_DRV_ILI9341,
+  LB_DRV_ILI9488,
 };
 
 // Panels whose controller needs a vendor init table that differs from the

@@ -168,7 +168,7 @@ void LB_Display::backlight(uint8_t level) {
 
 void LB_Display::printInfo(Print &out) const {
   static const char *kDrivers[] = {"ST7735", "ST7789", "ST7796", "NV3007",
-                                   "ILI9341"};
+                                   "ILI9341", "ILI9488"};
   out.println(F("---- Lonely Binary Display ----"));
   out.printf("Panel      : %s (%s)\n", _panel->name, _panel->id);
   out.printf("Driver IC  : %s\n", kDrivers[_panel->driver]);

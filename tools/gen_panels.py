@@ -41,7 +41,7 @@ BANNER = "GENERATED FROM panels.yaml BY tools/gen_panels.py — DO NOT EDIT"
 LLMS_BEGIN = "<!-- BEGIN GENERATED PANEL TABLE — panels.yaml via tools/gen_panels.py -->"
 LLMS_END = "<!-- END GENERATED PANEL TABLE -->"
 
-DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341"]
+DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341", "ILI9488"]  # append only: values are baked into sketches
 INIT_OPS = {None: "LB_INIT_NONE", "nv3007_279": "LB_INIT_NV3007_279"}
 
 
