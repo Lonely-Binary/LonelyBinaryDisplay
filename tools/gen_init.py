@@ -2,7 +2,7 @@
 """
 gen_init.py - turn a CaptureInit run into src/LB_TFTInit.h.
 
-    python3 tools/gen_init.py /tmp/initcapture.txt
+    python3 tools/gen_init.py tools/initcapture.txt
 
 Why captured rather than transcribed: porting a panel driver usually dies on a
 single mistyped byte, and the symptom is a black screen with no error at all.
@@ -42,6 +42,9 @@ with open(OUT, "w") as f:
  *
  * Format: cmd, nbytes, delay_ms, data...   terminated by 0xFF, 0xFF.
  *
+ * Only the controller's own sequence is here. Reset, inversion, MADCTL and the
+ * address window depend on the panel and are sent by LB_TFT.cpp.
+ *
  * !! The delays are not decoration !!
  *   They were the easiest thing to lose in this port - a delay is a delay()
  *   call or a DELAY opcode, not a bus write, so the first version of the
@@ -66,13 +69,36 @@ with open(OUT, "w") as f:
                 cur[2] = v
         if cur: entries.append(cur)
 
+        # The capture is a whole begin(), not just the table. Two parts of it
+        # belong to the driver code rather than to the controller:
+        #
+        #  - a leading SWRESET. The capture ran with rst = -1, so it recorded
+        #    the software-reset branch - and without its delay, which is a
+        #    delay() call the recorder cannot see. Reset differs per
+        #    controller (ST7789 sends SWRESET even after a hardware reset),
+        #    so LB_TFT.cpp owns it.
+        #  - the tail begin() sends after the table: INVON/INVOFF, MADCTL,
+        #    CASET, RASET, RAMWR. Those carry the capture panel's inversion,
+        #    rotation and offsets, which are not this panel's.
+        if entries and entries[0][0] == 0x01:
+            entries.pop(0)
+        tail = [0x2C, 0x2B, 0x2A, 0x36]
+        for want in tail:
+            if not entries or entries[-1][0] != want:
+                sys.exit(f"{name}: capture does not end in INV/MADCTL/CASET/RASET/RAMWR - "
+                         "has the driver's begin() changed?")
+            entries.pop()
+        if not entries or entries[-1][0] not in (0x20, 0x21):
+            sys.exit(f"{name}: no INVON/INVOFF before MADCTL - has begin() changed?")
+        entries.pop()
+
         data = []
         for cmd, payload, dly in entries:
             data += [cmd, len(payload), dly] + payload
         data += [0xFF, 0xFF]
 
         f.write(f"\n/* {name}: {len(entries)} commands, {len(data)} bytes */\n")
-        f.write(f"static const uint8_t LB_INIT_{name}[{len(data)}] = {{\n")
+        f.write(f"static const uint8_t LB_INITSEQ_{name}[{len(data)}] = {{\n")
         for i in range(0, len(data), 12):
             f.write("  " + ",".join(f"0x{x:02X}" for x in data[i:i+12]) + ",\n")
         f.write("};\n")
