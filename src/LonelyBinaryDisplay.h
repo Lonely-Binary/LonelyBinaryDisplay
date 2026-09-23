@@ -39,13 +39,41 @@
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 
+#include "LB_TFTPanel.h"
 #include "LB_Colors.h"
 #include "LB_Panels.h"
 #include "LB_Wiring.h"
 
-class LB_Display {
+class LB_Display : private LB_TFTPanel, public LB_Canvas {
  public:
-  explicit LB_Display(const LB_PanelDef *panel) : _panel(panel) {}
+  /*
+   * LB_Display IS a drawing surface, the same way LB_VGA is. That is what lets
+   * one function serve every product:
+   *
+   *     void drawGauge(LB_Canvas &c, float value);   // TFT, VGA and e-paper
+   *
+   * Before this the library handed back an Arduino_GFX and e-paper would have
+   * handed back a GxEPD2_GFX, which share no base class - hence the old rule
+   * about always writing `auto *gfx`. That rule is gone, and so is the reason
+   * for it. gfx() is still here as an escape hatch for anything LB_Canvas does
+   * not cover, but the tutorials no longer teach it.
+   *
+   * Base order and private inheritance: LB_TFTPanel must be constructed before
+   * LB_Canvas is handed a reference to it, and both declare flush(), so the
+   * using-declarations below pick the canvas side explicitly. Private
+   * inheritance alone would not do it - C++ looks names up before it checks
+   * access, so the call would stay ambiguous.
+   */
+  explicit LB_Display(const LB_PanelDef *panel)
+      : LB_TFTPanel(), LB_Canvas(*static_cast<LB_TFTPanel *>(this)), _panel(panel) {}
+
+  using LB_Canvas::flush;
+  using LB_Canvas::sleep;
+  using LB_Canvas::supportsPartial;
+  using LB_Canvas::paletteSize;
+  using LB_Canvas::setPaletteColor;
+  using LB_Canvas::width;
+  using LB_Canvas::height;
   ~LB_Display();
 
   // ── Using your own wiring ────────────────────────────────────────────────
@@ -127,7 +155,9 @@ class LB_Display {
   // note at the top of this file.
   Arduino_GFX *gfx() const { return _gfx; }
 
-  const LB_PanelDef *panel() const { return _panel; }
+  /* Renamed from panel(): LB_Canvas::panel() returns the LB_Panel this canvas
+   * draws through, which is a different thing with the same old name. */
+  const LB_PanelDef *panelDef() const { return _panel; }
   bool hasCanvas() const { return _canvas != nullptr; }
 
   // The RGB565 framebuffer when begin(true) was used, else nullptr. LVGL
@@ -135,9 +165,6 @@ class LB_Display {
   // makes the flush callback a no-op — see the Lonely Binary LVGL library.
   uint16_t *framebuffer() const;
 
-  // Push the framebuffer to the panel. No-op when begin() was called without a
-  // canvas, so it is always safe to call.
-  void flush();
 
   // Backlight, 0 = off, 255 = full. Panels wired active-low and panels with
   // PWM dimming are handled here; the caller never needs to know which is
@@ -150,8 +177,6 @@ class LB_Display {
   void setRotation(uint8_t r);
   uint8_t rotation() const { return _gfx ? _gfx->getRotation() : _panel->rotation; }
 
-  int16_t width() const { return _gfx ? _gfx->width() : _panel->width; }
-  int16_t height() const { return _gfx ? _gfx->height() : _panel->height; }
 
   // Colour bars, a backlight sweep (PWM panels) and a panel info page — the
   // "does my wiring work" check. This is what the per-panel test sketches did.
