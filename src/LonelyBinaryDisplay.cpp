@@ -210,6 +210,11 @@ bool LB_Display::begin(bool useCanvas) {
 
   applyColorOrder();
 
+  // The driver already set the panel's own inversion (we passed it as `ips`),
+  // so this only matters when setInverted() came before begin(). Without it
+  // that call was dropped: _driver was still null, and nothing replayed it.
+  if (_inverted != _panel->invert) setInverted(_inverted);
+
   // Attach the backlight PWM and turn it on, exactly as the MicroPython begin()
   // does. Without this, _blReady stays false and backlight() returns at its
   // first line — so display.backlight(255) did nothing, and selfTest()'s

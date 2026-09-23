@@ -65,7 +65,8 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
    * access, so the call would stay ambiguous.
    */
   explicit LB_Display(const LB_PanelDef *panel)
-      : LB_TFTPanel(), LB_Canvas(*static_cast<LB_TFTPanel *>(this)), _panel(panel) {}
+      : LB_TFTPanel(), LB_Canvas(*static_cast<LB_TFTPanel *>(this)), _panel(panel),
+        _inverted(panel->invert) {}
 
   using LB_Canvas::flush;
   using LB_Canvas::sleep;
@@ -199,7 +200,7 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   bool               _blActiveLow = false;   // set from the panel in begin()
   bool               _blPolarityForced = false;
   uint8_t            _blLevel = 255;
-  bool               _inverted = false;
+  bool               _inverted;         // starts as the panel's, see ctor
   bool               _madctlOverride = false;
 
   Arduino_GFX *makeDriver();
