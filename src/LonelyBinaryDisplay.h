@@ -10,26 +10,19 @@
 
       void setup() {
         display.begin();
-        display.backlight(255);
-
-        auto *gfx = display.gfx();        // house style: ALWAYS auto (see below)
-        gfx->fillScreen(BLACK);
-        gfx->setCursor(10, 10);
-        gfx->print("Hello");
+        display.fillScreen(LB_BLACK);
+        display.setTextColor(LB_WHITE);
+        display.drawString("Hello", 10, 10);
+        display.flush();
       }
 
-  The panel constant resolves the driver IC, resolution, IPS flag, column/row
+  The panel constant resolves the driver IC, resolution, inversion, column/row
   offsets, SPI clock and backlight polarity from the table in LB_Panels.h; the
   GPIOs come from LB_Wiring.h and follow the board you picked in Tools > Board.
   Both files are generated from panels.yaml — see tools/gen_panels.py.
 
-  WHY `auto *gfx`, NOT `Arduino_GFX *gfx`:
-  On a TFT, gfx() hands back an Arduino_GFX (which derives from Print and
-  Arduino_G). On an e-paper panel it hands back a GxEPD2_GFX (which derives
-  from Adafruit_GFX). The two share no base class, but their drawing methods
-  have identical names — so one body of code compiles against both, as long as
-  the variable is declared `auto`. Writing the type out by hand forks every
-  sketch and every lesson the day e-paper arrives.
+  The panel driver is this library's own (LB_TFT.h); nothing from Arduino_GFX
+  is used any more.
 
   MIT License · Lonely Binary
 */
@@ -37,8 +30,6 @@
 #define LONELY_BINARY_DISPLAY_H
 
 #include <Arduino.h>
-#include <Arduino_GFX_Library.h>
-
 #include "LB_TFTPanel.h"
 #include "LB_Colors.h"
 #include "LB_Panels.h"
@@ -54,9 +45,8 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
    *
    * Before this the library handed back an Arduino_GFX and e-paper would have
    * handed back a GxEPD2_GFX, which share no base class - hence the old rule
-   * about always writing `auto *gfx`. That rule is gone, and so is the reason
-   * for it. gfx() is still here as an escape hatch for anything LB_Canvas does
-   * not cover, but the tutorials no longer teach it.
+   * about always writing `auto *gfx`. Both the rule and gfx() are gone: the
+   * driver is our own now, and there is no Arduino_GFX object to hand back.
    *
    * Base order and private inheritance: LB_TFTPanel must be constructed before
    * LB_Canvas is handed a reference to it, and both declare flush(), so the
@@ -65,7 +55,8 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
    * access, so the call would stay ambiguous.
    */
   explicit LB_Display(const LB_PanelDef *panel)
-      : LB_TFTPanel(), LB_Canvas(*static_cast<LB_TFTPanel *>(this)), _panel(panel) {}
+      : LB_TFTPanel(), LB_Canvas(*static_cast<LB_TFTPanel *>(this)), _panel(panel),
+        _inverted(panel->invert) {}
 
   using LB_Canvas::flush;
   using LB_Canvas::sleep;
@@ -118,10 +109,11 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   //     red -> yellow, green -> magenta,
   //     blue -> cyan                      BOTH are wrong
   //
-  // setInverted() works at any time. setColorOrder() works at any time too on
-  // ST7789 / ST7796 / NV3007, where the order is just a bit in MADCTL — but
-  // NOT on ST7735, whose driver takes it as a constructor argument, so there
-  // it has to precede begin(). It returns false if it could not be applied.
+  // Both work at any time, before or after begin(), on every controller: the
+  // colour order is one bit in MADCTL and inversion is one command. (Under
+  // Arduino_GFX, ST7735 took the order as a constructor argument, so there it
+  // had to precede begin(). That restriction went with it.) setColorOrder()
+  // still returns bool so existing sketches compile; it is always true.
   enum ColorOrder { COLOR_AUTO, COLOR_RGB, COLOR_BGR };
   bool setColorOrder(ColorOrder order);
   void setInverted(bool inverted);
@@ -145,25 +137,32 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   // useCanvas allocates a full RGB565 framebuffer and draws into that, pushing
   // to the panel on flush(). It removes the flicker you get when redrawing
   // large text in place, and it is what LVGL wants. It needs
-  // width * height * 2 bytes, so it is PSRAM-only in practice — but a canvas is
+  // width * height * 2 bytes: PSRAM is used when the board has it, and the
+  // smaller panels (up to about 128 x 160) also fit in internal RAM. A canvas is
   // a preference, not a requirement: if the allocation fails, begin() says so
   // on Serial and draws straight at the panel instead of failing. So it is
   // always safe to ask for one; hasCanvas() reports which you got.
   bool begin(bool useCanvas = false);
 
-  // The drawing surface. Declare the receiving variable with `auto` — see the
-  // note at the top of this file.
-  Arduino_GFX *gfx() const { return _gfx; }
+  // True once begin() has brought the panel up.
+  bool begun() const { return _tft != nullptr; }
+
+  // Push a w x h block of RGB565 pixels (as the CPU holds them, row-major).
+  // Clipped to the screen. With a framebuffer this copies into it and shows on
+  // the next flush(), like everything else drawn through the canvas; without
+  // one it goes straight to the panel. This is what the LVGL library uses for
+  // its partial-render mode.
+  void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t *px);
 
   /* Renamed from panel(): LB_Canvas::panel() returns the LB_Panel this canvas
    * draws through, which is a different thing with the same old name. */
   const LB_PanelDef *panelDef() const { return _panel; }
-  bool hasCanvas() const { return _canvas != nullptr; }
+  bool hasCanvas() const { return _fb != nullptr; }
 
   // The RGB565 framebuffer when begin(true) was used, else nullptr. LVGL
   // renders straight into this instead of into a buffer of its own, which
   // makes the flush callback a no-op — see the Lonely Binary LVGL library.
-  uint16_t *framebuffer() const;
+  uint16_t *framebuffer() const { return _fb; }
 
 
   // Backlight, 0 = off, 255 = full. Panels wired active-low and panels with
@@ -175,7 +174,7 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   // landscape, and the driver applies the right pair — which is exactly the
   // bug you get when the offsets are hard-coded in a sketch.
   void setRotation(uint8_t r);
-  uint8_t rotation() const { return _gfx ? _gfx->getRotation() : _panel->rotation; }
+  uint8_t rotation() const { return _tft ? _tft->rotation() : _panel->rotation; }
 
 
   // Colour bars, a backlight sweep (PWM panels) and a panel info page — the
@@ -190,26 +189,18 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   LB_Wiring          _wiring = LB_WIRING;  // kit default until setWiring()
   bool               _customWiring = false;
   int32_t            _spiHzOverride = 0;
-  Arduino_DataBus   *_bus    = nullptr;
-  Arduino_GFX       *_driver = nullptr;  // the panel itself
-  Arduino_Canvas    *_canvas = nullptr;  // framebuffer, when requested
-  Arduino_GFX       *_gfx    = nullptr;  // canvas if present, else driver
+  LB_TFTSpiBus      *_bus    = nullptr;
+  LB_TFT            *_tft    = nullptr;  // the panel itself
+  uint16_t          *_fb     = nullptr;  // framebuffer, when requested
+  bool               _fbInPsram = false;
   bool               _blReady = false;
   ColorOrder         _colorOrder = COLOR_AUTO;
   bool               _blActiveLow = false;   // set from the panel in begin()
   bool               _blPolarityForced = false;
   uint8_t            _blLevel = 255;
-  bool               _inverted = false;
-  bool               _madctlOverride = false;
+  bool               _inverted;         // starts as the panel's, see ctor
 
-  Arduino_GFX *makeDriver();
-  // The PANEL's rotation, which is not the same thing as rotation(). With a
-  // canvas, _gfx is the framebuffer — rotation 0 — while the driver holds the
-  // orientation MADCTL was actually programmed for. Anything that writes
-  // MADCTL must use this one.
-  uint8_t panelRotation() const;
   void backlightBegin();
-  void applyColorOrder();
 };
 
 #endif  // LONELY_BINARY_DISPLAY_H
