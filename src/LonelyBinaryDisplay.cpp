@@ -217,16 +217,16 @@ bool LB_Display::begin(bool useCanvas) {
   // PWM was setColorOrder(), which almost no sketch calls.
   backlightBegin();
   backlight(255);
+
+  // Hand whatever begin() built - the canvas if there is one, otherwise the
+  // driver - to the LB_Panel adapter, so LB_Canvas draws through it.
+  attach(_gfx, _canvas);
   return true;
 }
 
 
 uint16_t *LB_Display::framebuffer() const {
   return _canvas ? _canvas->getFramebuffer() : nullptr;
-}
-
-void LB_Display::flush() {
-  if (_canvas) _canvas->flush();
 }
 
 void LB_Display::setRotation(uint8_t r) {
@@ -242,6 +242,7 @@ void LB_Display::setRotation(uint8_t r) {
     return;
   }
   _gfx->setRotation(r);
+  LB_Canvas::setRotation(r);  /* keep the canvas's idea of rotation in step */
   // The driver just rewrote MADCTL from its own idea of the colour order, so
   // ours has to go back on top.
   if (_madctlOverride) {
@@ -328,54 +329,58 @@ void LB_Display::printInfo(Print &out) const {
 
 void LB_Display::selfTest() {
   if (!_gfx) return;
-  auto *g = _gfx;
   const int16_t w = width(), h = height();
 
-  // 1. Solid colours — confirms the panel, the wiring and the colour order.
-  const uint16_t solids[] = {LB_RED, LB_GREEN, LB_BLUE};
+  // Everything below draws through LB_Canvas rather than through gfx(), which
+  // is the point of the migration: this same body would run on VGA or on
+  // e-paper. It is also the self-test, so if the canvas path is wrong on a
+  // real panel, this is where it shows.
+  //
+  // Colours are lb_color_t, NOT the RGB565 names. Handing an lb_color_t to a
+  // gfx() call truncates it silently - see LB_Colors.h.
+
+  // 1. Solid colours - confirms the panel, the wiring and the colour order.
+  const lb_color_t solids[] = {LB_RED, LB_GREEN, LB_BLUE};
   const char *names[] = {"RED", "GREEN", "BLUE"};
   for (int i = 0; i < 3; i++) {
-    g->fillScreen(solids[i]);
-    g->setTextColor(LB_WHITE);
-    g->setTextSize(2);
-    g->setCursor(4, h / 2 - 8);
-    g->print(names[i]);
+    fillScreen(solids[i]);
+    setTextColor(LB_WHITE);
+    setTextSize(2);
+    drawString(names[i], 4, h / 2 - 8);
     flush();
     delay(700);
   }
 
   // 2. Backlight sweep. Every panel in the range dims, so this runs on all of
-  //    them — and it is the quickest way to spot a polarity mistake, because a
+  //    them - and it is the quickest way to spot a polarity mistake, because a
   //    panel wired the other way round sweeps backwards.
   if (_wiring.backlight >= 0) {
-    g->fillScreen(LB_WHITE);
-    g->setTextColor(LB_BLACK);
-    g->setTextSize(1);
-    g->setCursor(4, 4);
-    g->print("Backlight sweep");
+    fillScreen(LB_WHITE);
+    setTextColor(LB_BLACK);
+    setTextSize(1);
+    drawString("Backlight sweep", 4, 4);
     flush();
     for (int v = 255; v >= 30; v -= 5) { backlight(v); delay(8); }
     for (int v = 30; v <= 255; v += 5) { backlight(v); delay(8); }
   }
 
   // 3. Colour bars + panel identity.
-  g->fillScreen(LB_BLACK);
-  const uint16_t bars[] = {LB_RED, LB_GREEN, LB_BLUE, LB_YELLOW,
-                           LB_MAGENTA, LB_CYAN, LB_WHITE, LB_GREY};
+  fillScreen(LB_BLACK);
+  const lb_color_t bars[] = {LB_RED, LB_GREEN, LB_BLUE, LB_YELLOW,
+                             LB_MAGENTA, LB_CYAN, LB_WHITE, LB_GRAY};
   const int16_t barTop = h / 3;
   const int16_t barH = (h - barTop) / 8;
   for (int i = 0; i < 8; i++) {
-    g->fillRect(0, barTop + i * barH, w, barH, bars[i]);
+    fillRect(0, barTop + i * barH, w, barH, bars[i]);
   }
 
-  g->setTextColor(LB_WHITE);
-  g->setTextSize(w >= 200 ? 2 : 1);
-  g->setCursor(4, 6);
-  g->print("LonelyBinary");
-  g->setTextSize(1);
-  g->setCursor(4, barTop - 22);
-  g->print(_panel->name);
-  g->setCursor(4, barTop - 12);
-  g->printf("%dx%d", w, h);
+  setTextColor(LB_WHITE);
+  setTextSize(w >= 200 ? 2 : 1);
+  drawString("LonelyBinary", 4, 6);
+  setTextSize(1);
+  drawString(_panel->name, 4, barTop - 22);
+  char wh[24];
+  snprintf(wh, sizeof(wh), "%dx%d", w, h);
+  drawString(wh, 4, barTop - 12);
   flush();
 }
