@@ -10,96 +10,9 @@
 #define LB_BL_PWM_CHANNEL 0
 
 LB_Display::~LB_Display() {
-  delete _canvas;
-  delete _driver;
+  delete _tft;
   delete _bus;
-}
-
-Arduino_GFX *LB_Display::makeDriver() {
-  const LB_PanelDef *p = _panel;
-  // Note on the `ips` argument below: in Arduino_GFX that flag does exactly
-  // one thing — decide whether the panel is inverted at rest — so our single
-  // `invert` field is what belongs there. Passing a separate "is it an IPS
-  // panel" value would silently fight setInverted().
-  switch (p->driver) {
-    case LB_DRV_ST7735:
-      // The only driver with a colour-order argument. Using it means no
-      // MADCTL patching is needed for these panels.
-      return new Arduino_ST7735(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
-                                p->width, p->height,
-                                p->colOff1, p->rowOff1, p->colOff2, p->rowOff2,
-                                colorOrderIsBGR());
-    case LB_DRV_ST7789:
-      return new Arduino_ST7789(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
-                                p->width, p->height,
-                                p->colOff1, p->rowOff1, p->colOff2, p->rowOff2);
-    case LB_DRV_ST7796:
-      return new Arduino_ST7796(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
-                                p->width, p->height,
-                                p->colOff1, p->rowOff1, p->colOff2, p->rowOff2);
-    case LB_DRV_ILI9341:
-      // Hardcodes BGR in its own MADCTL, so like ST7789 and ST7796 the colour
-      // order comes from our register rewrite rather than a constructor arg.
-      return new Arduino_ILI9341(_bus, _wiring.rst, p->rotation, p->invert,
-                                 p->width, p->height,
-                                 p->colOff1, p->rowOff1, p->colOff2, p->rowOff2);
-
-    case LB_DRV_NV3007:
-      // The 2.79" is the same silicon as the 1.68" but needs its own
-      // voltage/gamma table — without it the panel comes up looking wrong.
-      if (p->initOps == LB_INIT_NV3007_279) {
-        return new Arduino_NV3007(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
-                                  p->width, p->height,
-                                  p->colOff1, p->rowOff1, p->colOff2, p->rowOff2,
-                                  nv3007_279_init_operations,
-                                  sizeof(nv3007_279_init_operations));
-      }
-      return new Arduino_NV3007(_bus, _wiring.rst, p->rotation, p->invert /* Arduino_GFX calls this `ips`; it only controls inversion */,
-                                p->width, p->height,
-                                p->colOff1, p->rowOff1, p->colOff2, p->rowOff2);
-  }
-  return nullptr;
-}
-
-// MADCTL (0x36) is the same register on every controller we drive, and bit 3
-// selects BGR. The rotation bits are not the same between families, so both
-// mappings are transcribed here from the Arduino_GFX drivers. This is chip
-// register semantics rather than library internals, so it is stable.
-static uint8_t lb_madctl(LB_Driver drv, uint8_t r, bool bgr) {
-  const uint8_t MY = 0x80, MX = 0x40, MV = 0x20, BGR = 0x08;
-  uint8_t bits;
-  if (drv == LB_DRV_ST7735) {
-    switch (r & 3) {
-      case 1:  bits = MY | MV; break;
-      case 2:  bits = 0;       break;
-      case 3:  bits = MX | MV; break;
-      default: bits = MX | MY; break;
-    }
-  } else if (drv == LB_DRV_ILI9341) {
-    // A third mapping again — ILI9341 agrees with neither family above.
-    switch (r & 3) {
-      case 1:  bits = MV;           break;
-      case 2:  bits = MY;           break;
-      case 3:  bits = MX | MY | MV; break;
-      default: bits = MX;           break;
-    }
-  } else {  // ST7789 / ST7796 / NV3007 share one mapping
-    switch (r & 7) {
-      case 1:  bits = MX | MV;      break;
-      case 2:  bits = MX | MY;      break;
-      case 3:  bits = MY | MV;      break;
-      case 4:  bits = MX;           break;
-      case 5:  bits = MX | MY | MV; break;
-      case 6:  bits = MY;           break;
-      case 7:  bits = MV;           break;
-      default: bits = 0;            break;
-    }
-  }
-  return bits | (bgr ? BGR : 0);
-}
-
-uint8_t LB_Display::panelRotation() const {
-  return _driver ? _driver->getRotation() : _panel->rotation;
+  free(_fb);
 }
 
 bool LB_Display::colorOrderIsBGR() const {
@@ -109,148 +22,108 @@ bool LB_Display::colorOrderIsBGR() const {
 }
 
 bool LB_Display::setColorOrder(ColorOrder order) {
-  if (!_gfx) {                 // before begin(): always fine
-    _colorOrder = order;
-    return true;
-  }
-  if (_panel->driver == LB_DRV_ST7735) {
-    // Arduino_GFX takes the order as a constructor argument for this driver,
-    // and the object is already built.
-    Serial.println(F("[LB_Display] setColorOrder() must precede begin() on an "
-                     "ST7735 panel."));
-    return false;
-  }
-  // Everywhere else it is only a bit in MADCTL, so it can be changed live.
   _colorOrder = order;
-  applyColorOrder();
-  setInverted(_panel->invert);
-
-  backlightBegin();
-  backlight(255);
+  if (_tft) _tft->setColorOrder(colorOrderIsBGR());
   return true;
 }
 
 void LB_Display::setInverted(bool inverted) {
   _inverted = inverted;
-  // Arduino_GFX computes (_ips ^ i), and we hand it the panel's `invert` flag
-  // as `ips`, so passing the difference here lands on the requested state.
-  if (_driver) _driver->invertDisplay(inverted != _panel->invert);
-}
-
-// ST7735 took the colour order in its constructor; the others hardcode a bit
-// in MADCTL, so we own that register for them and always write it.
-//
-// The rotation fed to lb_madctl() has to be the PANEL's, not _gfx's: with a
-// canvas in play _gfx is the framebuffer and reports rotation 0, so using it
-// reprogrammed a landscape panel back to portrait scan order and the screen
-// turned to garbage. Found on the 1.9" with a canvas allocated.
-//
-// It is tempting to skip the write when the request happens to match the
-// driver's own hardcoded default — and that is a bug, found on a 1.9" ST7789:
-// after forcing BGR, asking for RGB again matched ST7789's default, the write
-// was skipped, and the panel stayed in BGR. The driver only ever writes MADCTL
-// from setRotation(), so "switching back" has no other path. Always write.
-void LB_Display::applyColorOrder() {
-  if (_panel->driver == LB_DRV_ST7735) return;  // handled at construction
-  _madctlOverride = true;
-  _bus->beginWrite();
-  _bus->writeC8D8(0x36, lb_madctl(_panel->driver, panelRotation(), colorOrderIsBGR()));
-  _bus->endWrite();
+  if (_tft) _tft->setInverted(inverted);
 }
 
 void LB_Display::setWiring(const LB_Wiring &wiring) {
-  if (_gfx) return;  // too late; begin() has already built the bus
+  if (_tft) return;  // too late; begin() has already built the bus
   _wiring = wiring;
   _customWiring = true;
 }
 
 bool LB_Display::begin(bool useCanvas) {
-  if (_gfx) return true;  // already up
+  if (_tft) return true;  // already up
 
   const int32_t spiHz = _spiHzOverride ? _spiHzOverride : _panel->spiHz;
 
-  _bus = new Arduino_ESP32SPI(_wiring.dc, _wiring.cs, _wiring.sclk,
-                              _wiring.mosi, GFX_NOT_DEFINED /* MISO unused */,
-                              _wiring.spiHost, true /* shared bus */);
-  _driver = makeDriver();
-  if (!_driver) return false;
-
-  // Bring the panel up FIRST. Arduino_TFT only swaps WIDTH/HEIGHT for a
-  // landscape rotation inside setRotation(), which begin() is what calls — so
-  // reading _driver->width() before this point returns the portrait size and a
-  // canvas built from it comes out the wrong shape. That bug reached hardware:
-  // a 170x320 panel at rotation 1 reported 170x320 instead of 320x170 and LVGL
-  // drew into a slice of the screen.
-  if (!_driver->begin(spiHz)) {
+  _bus = new LB_TFTSpiBus(_wiring.dc, _wiring.cs, _wiring.sclk, _wiring.mosi,
+                          _wiring.spiHost);
+  _tft = new LB_TFT(_bus, _panel, _wiring.rst);
+  // Colour order and inversion go in here, so anything set before begin()
+  // is what the panel comes up with. _inverted starts as the panel table's
+  // value (see the constructor) - if it started as false, every panel whose
+  // table says invert: true would come up as a photo negative.
+  if (!_tft->begin(spiHz, colorOrderIsBGR(), _inverted)) {
     Serial.println(F("[LB_Display] panel begin failed — check the wiring, "
                      "DC in particular."));
+    delete _tft;
+    _tft = nullptr;
     return false;
   }
-  _gfx = _driver;
 
   if (useCanvas) {
-    // Now the driver knows its rotated size, so the framebuffer matches it.
-    _canvas = new Arduino_Canvas(_driver->width(), _driver->height(), _driver);
-    // GFX_SKIP_OUTPUT_BEGIN: the panel is already up, do not re-init it.
-    if (_canvas->begin(GFX_SKIP_OUTPUT_BEGIN)) {
-      _gfx = _canvas;
+    // The panel is already at its rotation, so this is the shape the canvas
+    // draws in. PSRAM first; the smaller panels also fit in internal RAM.
+    const size_t bytes = (size_t)_tft->width() * _tft->height() * 2;
+    _fb = (uint16_t *)heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    _fbInPsram = _fb != nullptr;
+    if (!_fb) _fb = (uint16_t *)heap_caps_malloc(bytes, MALLOC_CAP_8BIT);
+    if (_fb) {
+      memset(_fb, 0, bytes);
     } else {
-      // width * height * 2 bytes would not fit. Fall back to drawing straight
-      // at the panel rather than failing: begin(true) is a preference, not a
-      // requirement, and hasCanvas() reports which one you got.
-      delete _canvas;
-      _canvas = nullptr;
+      // begin(true) is a preference, not a requirement: draw straight at the
+      // panel rather than failing, and hasCanvas() reports which one you got.
       Serial.printf("[LB_Display] no room for a %d x %d framebuffer "
                     "(%lu bytes) — drawing direct instead. Enable "
                     "Tools > PSRAM if your board has it.\n",
-                    _driver->width(), _driver->height(),
-                    (unsigned long)_driver->width() * _driver->height() * 2);
+                    _tft->width(), _tft->height(), (unsigned long)bytes);
     }
   }
-
-  applyColorOrder();
 
   // Attach the backlight PWM and turn it on, exactly as the MicroPython begin()
   // does. Without this, _blReady stays false and backlight() returns at its
   // first line — so display.backlight(255) did nothing, and selfTest()'s
-  // backlight sweep was silently skipped. The only path that ever attached the
-  // PWM was setColorOrder(), which almost no sketch calls.
+  // backlight sweep was silently skipped.
   backlightBegin();
   backlight(255);
 
-  // Hand whatever begin() built - the canvas if there is one, otherwise the
-  // driver - to the LB_Panel adapter, so LB_Canvas draws through it.
-  attach(_gfx, _canvas);
+  // Hand the driver and the framebuffer (if any) to the LB_Panel adapter, so
+  // LB_Canvas draws through it.
+  attach(_tft, _fb);
   return true;
 }
 
-
-uint16_t *LB_Display::framebuffer() const {
-  return _canvas ? _canvas->getFramebuffer() : nullptr;
+void LB_Display::pushImage(int16_t x, int16_t y, int16_t w, int16_t h,
+                           const uint16_t *px) {
+  if (!_tft || !px) return;
+  if (!_fb) {
+    _tft->pushImage(x, y, w, h, px);
+    return;
+  }
+  // Into the framebuffer, clipped; it reaches the panel on flush().
+  const int16_t fw = _tft->width(), fh = _tft->height();
+  for (int16_t r = 0; r < h; r++) {
+    const int16_t yy = y + r;
+    if (yy < 0 || yy >= fh) continue;
+    int16_t x0 = x < 0 ? 0 : x;
+    int16_t x1 = x + w > fw ? fw : x + w;
+    if (x1 <= x0) return;
+    memcpy(_fb + (size_t)yy * fw + x0, px + (size_t)r * w + (x0 - x),
+           (size_t)(x1 - x0) * 2);
+  }
 }
 
 void LB_Display::setRotation(uint8_t r) {
-  if (!_gfx) return;
+  if (!_tft) return;
   r &= 3;
-  if (_canvas && ((r ^ rotation()) & 1)) {
+  if (_fb && ((r ^ _tft->rotation()) & 1)) {
     // Portrait <-> landscape would need a framebuffer of the other shape, and
     // the one we allocated is the wrong way round. Refuse rather than render
     // into a mis-shaped buffer.
     Serial.println(F("[LB_Display] cannot switch between portrait and "
-                     "landscape while a canvas is allocated — set the rotation "
-                     "before begin(true), or use begin() without a canvas."));
+                     "landscape while a canvas is allocated — use begin() "
+                     "without a canvas to rotate that far."));
     return;
   }
-  _gfx->setRotation(r);
+  _tft->setRotation(r);
   LB_Canvas::setRotation(r);  /* keep the canvas's idea of rotation in step */
-  // The driver just rewrote MADCTL from its own idea of the colour order, so
-  // ours has to go back on top.
-  if (_madctlOverride) {
-    _bus->beginWrite();
-    _bus->writeC8D8(0x36,
-                    lb_madctl(_panel->driver, panelRotation(), colorOrderIsBGR()));
-    _bus->endWrite();
-  }
 }
 
 // ─── Backlight ───────────────────────────────────────────────────────────────
@@ -318,7 +191,8 @@ void LB_Display::printInfo(Print &out) const {
              _colorOrder == COLOR_AUTO ? "" : " (forced)",
              _inverted ? "" : "not ",
              _inverted == _panel->invert ? "" : " (forced)");
-  out.printf("Framebuffer: %s\n", _canvas ? "yes (PSRAM canvas)" : "no (direct)");
+  out.printf("Framebuffer: %s\n", !_fb ? "no (direct)"
+                                 : _fbInPsram ? "yes (PSRAM)" : "yes (internal RAM)");
   // A customer whose screen misbehaves pastes this whole block into an AI
   // assistant. Carrying the URL means the assistant is handed the library's
   // real API along with the symptom, instead of guessing from TFT_eSPI.
@@ -328,7 +202,7 @@ void LB_Display::printInfo(Print &out) const {
 }
 
 void LB_Display::selfTest() {
-  if (!_gfx) return;
+  if (!_tft) return;
   const int16_t w = width(), h = height();
 
   // Everything below draws through LB_Canvas rather than through gfx(), which

@@ -18,11 +18,23 @@ jobs:
       - run: pip install pyyaml
       - name: Generated tables match panels.yaml
         run: python3 tools/gen_panels.py --check
+      # Same idea for the init sequences: they are generated from a recording
+      # of what Arduino_GFX sent (tools/initcapture.txt), never typed in.
+      - name: Init tables match the capture
+        run: |
+          python3 tools/gen_init.py tools/initcapture.txt
+          git diff --exit-code src/LB_TFTInit.h
 
   arduino:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Lonely Binary GFX is not in the Library Manager index yet, so
+      # `depends=` cannot fetch it. Check it out beside the library instead.
+      - uses: actions/checkout@v4
+        with:
+          repository: Lonely-Binary/LonelyBinaryGFX
+          path: .deps/LonelyBinaryGFX
       - uses: arduino/setup-arduino-cli@v2
       - name: Install core and dependencies
         run: |
@@ -31,14 +43,13 @@ jobs:
             https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core update-index
           arduino-cli core install esp32:esp32
-          arduino-cli lib install "GFX Library for Arduino"
       - name: Build every example on both MCUs
         run: |
           set -e
           for fqbn in esp32:esp32:esp32s3 esp32:esp32:esp32; do
             for ex in examples/*/; do
               echo "== $fqbn $ex"
-              arduino-cli compile --fqbn "$fqbn" --library . "$ex"
+              arduino-cli compile --fqbn "$fqbn" --library . --library .deps/LonelyBinaryGFX "$ex"
             done
           done
 
@@ -50,10 +61,11 @@ jobs:
           mkdir -p /tmp/PanelSweep
           for fqbn in esp32:esp32:esp32s3 esp32:esp32:esp32; do
             for p in LB_TFT_096 LB_TFT_18 LB_TFT_20 LB_TFT_24 LB_TFT_28 LB_TFT_35 \
-                     LB_NARROW_114 LB_NARROW_168 LB_NARROW_19 LB_NARROW_225 LB_NARROW_279; do
+                     LB_NARROW_114 LB_NARROW_168 LB_NARROW_19 LB_NARROW_225 LB_NARROW_279 \
+                     LB_ILI9341_240X320; do
               sed "s/LB_TFT_24/$p/" examples/SelfTest/SelfTest.ino > /tmp/PanelSweep/PanelSweep.ino
               echo "== $fqbn $p"
-              arduino-cli compile --fqbn "$fqbn" --library . /tmp/PanelSweep
+              arduino-cli compile --fqbn "$fqbn" --library . --library .deps/LonelyBinaryGFX /tmp/PanelSweep
             done
           done
 

@@ -1,6 +1,6 @@
 #pragma once
 //
-// Legacy colour names for code that talks to gfx() directly.
+// Legacy colour names, as raw RGB565.
 //
 // !! The LB_* colour names are NOT here any more !!
 //
@@ -15,36 +15,35 @@
 //   compiling cleanly and running happily. It took a byte-level comparison
 //   against Arduino_GFX's own output to find. Do not reintroduce them.
 //
-// What is still here: the bare pre-1.6.5 names (BLACK, RED, ...), because
-// GFX Library for Arduino 1.6.5 renamed them to RGB565_*. They are RGB565
-// values, for the gfx() escape hatch only.
+// What is still here: the bare names (BLACK, RED, ...) as plain RGB565
+// values, for code that handles raw pixels - pushImage(), framebuffer(), or
+// LVGL. They used to come from Arduino_GFX (RGB565_BLACK and so on); the
+// values are written out now because Arduino_GFX is no longer a dependency.
 //
 // !! Never mix the two !!
 //
 //       display.fillScreen(LB_BLACK);          // lb_color_t  - correct
-//       display.gfx()->fillScreen(BLACK);      // uint16_t    - correct
-//       display.gfx()->fillScreen(LB_BLACK);   // WRONG, silently truncates
+//       framebuffer[i] = BLACK;                // uint16_t    - correct
+//       framebuffer[i] = LB_BLACK;             // WRONG, silently truncates
 //
 // Define LB_NO_LEGACY_COLORS to suppress the bare names if they collide with
 // something in your own code.
 
-#include <Arduino_GFX_Library.h>
-
 #ifndef LB_NO_LEGACY_COLORS
   #ifndef BLACK
-    #define BLACK   RGB565_BLACK
-    #define WHITE   RGB565_WHITE
-    #define RED     RGB565_RED
-    #define GREEN   RGB565_GREEN
-    #define BLUE    RGB565_BLUE
-    #define YELLOW  RGB565_YELLOW
-    #define MAGENTA RGB565_MAGENTA
-    #define CYAN    RGB565_CYAN
+    #define BLACK   0x0000
+    #define WHITE   0xFFFF
+    #define RED     0xF800
+    #define GREEN   0x07E0
+    #define BLUE    0x001F
+    #define YELLOW  0xFFE0
+    #define MAGENTA 0xF81F
+    #define CYAN    0x07FF
   #endif
   #ifndef LIME
-    #define LIME    RGB565_LIME
+    #define LIME    0x07E0
   #endif
   #ifndef ORANGE
-    #define ORANGE  RGB565_ORANGE
+    #define ORANGE  0xFD20
   #endif
 #endif
