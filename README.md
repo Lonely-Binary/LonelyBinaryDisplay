@@ -8,7 +8,7 @@ hardware no-op — this library makes it a software no-op too.
 LB_Display display(LB_TFT_24);   // ← the only line that changes
 ```
 
-That constant resolves the driver IC, resolution, IPS flag, column/row offsets,
+That constant resolves the driver IC, resolution, inversion, column/row offsets,
 SPI clock and backlight polarity. The GPIOs follow the board you picked in
 **Tools ▸ Board** — classic ESP32 or ESP32-S3, no edits either way.
 
@@ -56,7 +56,8 @@ from it, and there is never more than one entry for a size.
 ## Arduino
 
 Install **Lonely Binary Display** from Library Manager (it pulls in
-*GFX Library for Arduino*), then **File ▸ Examples ▸ Lonely Binary Display**.
+*Lonely Binary GFX*, the drawing API), then
+**File ▸ Examples ▸ Lonely Binary Display**.
 
 ```cpp
 #include <LonelyBinaryDisplay.h>
@@ -64,19 +65,22 @@ Install **Lonely Binary Display** from Library Manager (it pulls in
 LB_Display display(LB_TFT_24);
 
 void setup() {
-  display.begin();
-  display.backlight(255);
+  display.begin();                    // backlight comes on at full
 
-  auto *gfx = display.gfx();          // note: auto — see below
-  gfx->fillScreen(BLACK);
-  gfx->setTextColor(WHITE);
-  gfx->setTextSize(2);
-  gfx->setCursor(10, 10);
-  gfx->print("Hello");
+  display.fillScreen(LB_BLACK);
+  display.setTextColor(LB_WHITE);
+  display.setTextSize(2);
+  display.drawString("Hello", 10, 10);
+  display.flush();                    // no-op without a framebuffer; always call it
 }
 
 void loop() {}
 ```
+
+`LB_Display` *is* the drawing surface — the same `LB_Canvas` API that
+Lonely Binary VGA and e-paper use, so a function written against
+`LB_Canvas &` runs on all of them. The panel driver is the library's own;
+nothing else is needed.
 
 ### Using your own wiring
 
@@ -152,10 +156,9 @@ void setup() {
 }
 ```
 
-Both are live register writes, so a test sketch can sweep them. The one
-exception is **ST7735**, where Arduino_GFX takes the colour order as a
-constructor argument — there `setColorOrder()` has to come *before* `begin()`,
-and it returns `false` if you call it too late rather than failing quietly.
+Both are single register writes, so they work at any time — before `begin()`
+(the panel then comes up that way) or after it, on every controller — and a
+test sketch can sweep them live.
 
 A third knob belongs with these two, for the same reason: the backlight can be
 wired either way round, and getting it wrong is easy to misread because the
@@ -176,36 +179,30 @@ If you find a wrong value for a panel **we sell**, please tell us rather than
 working around it in your sketch — it belongs in `panels.yaml`, where both the
 Arduino and MicroPython sides pick it up.
 
-### Always write `auto *gfx`
-
-On a TFT, `gfx()` returns an `Arduino_GFX`. On an e-paper panel it returns a
-`GxEPD2_GFX`. The two share **no base class**, but their drawing methods have
-identical names — so one body of code compiles against both, as long as the
-variable is declared `auto`. Spelling the type out by hand forks every sketch
-the day you plug in an e-paper module.
-
 ### API
 
 | | |
 |---|---|
 | `begin(bool useCanvas = false)` | Bring up SPI, panel and backlight. `true` asks for a framebuffer (flicker-free redraws, and what LVGL wants); if there is no room it says so and draws direct instead, so it is safe to ask for. `hasCanvas()` reports what you got. |
-| `gfx()` | The drawing surface. |
+| Drawing | `fillScreen`, `fillRect`, `drawLine`, `drawCircle`, `drawString`, `drawJpg`, … — the Lonely Binary GFX API, colours as `LB_RED` etc. |
+| `pushImage(x, y, w, h, px)` | A block of raw RGB565 pixels. Into the framebuffer if there is one, else straight to the panel. |
+| `framebuffer()` | The RGB565 framebuffer after `begin(true)`, or `nullptr`. |
 | `flush()` | Push the framebuffer. No-op without a canvas, so always safe to call. |
 | `backlight(0..255)` | PWM on every panel. Active-high vs active-low is decided by the panel table, not by you. |
 | `setWiring(pins)` | Your own GPIOs. Before `begin()`. |
 | `setSpiHz(hz)` | Override the panel's SPI clock. Before `begin()`; `0` restores the default. |
-| `setColorOrder(order)` | `COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time, except on ST7735 where it must precede `begin()`. Returns `false` if it could not be applied. |
-| `setInverted(bool)` | Flip the panel's inversion. Any time. |
+| `setColorOrder(order)` | `COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time. |
+| `setInverted(bool)` | Set the panel's inversion. Any time. |
 | `setBacklightActiveLow(bool)` | Flip the backlight polarity. Any time. |
-| `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. |
+| `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. With a framebuffer, only 0 ↔ 2 or 1 ↔ 3 (the buffer keeps its shape). |
 | `width()` / `height()` | Current size, rotation included. |
 | `selfTest()` | Colour bars, backlight sweep, panel identity. |
 | `printInfo()` | The same details on Serial. |
 
-Colour names (`BLACK`, `RED`, …) are provided for you — GFX Library 1.6.5
-renamed them to `RGB565_*`, and the shim lives here instead of in every sketch.
-Prefixed `LB_BLACK` / `LB_RED` / … are always available; define
-`LB_NO_LEGACY_COLORS` to suppress the bare names.
+Drawing calls take `LB_BLACK`, `LB_RED`, … (`lb_color_t`, from
+Lonely Binary GFX). The bare names `BLACK`, `RED`, … are raw RGB565 values, for
+`pushImage()` and `framebuffer()` only — never pass one to a drawing call, or
+the other way round. Define `LB_NO_LEGACY_COLORS` to suppress the bare names.
 
 ---
 
@@ -254,8 +251,10 @@ d = LBDisplay(TFT_24, wiring=pins)
 d.begin()
 ```
 
-The API mirrors the Arduino one: `begin()`, `gfx()`, `backlight()`,
-`set_rotation()`, `width()`, `height()`, `self_test()`, `print_info()`.
+The setup calls mirror the Arduino ones: `begin()`, `backlight()`,
+`set_rotation()`, `width()`, `height()`, `self_test()`, `print_info()`. Drawing
+is different for now: on MicroPython it is on the object `gfx()` returns, not
+on the display itself.
 
 `nv3007.py` is only imported when a NV3007 panel is selected, so the other nine
 panels don't need it on the board.

@@ -16,7 +16,7 @@ customer will read as a broken screen rather than as broken code.
 - Licence: MIT
 
 The library's whole premise: **one constant selects the panel, and everything
-else follows from it.** Driver IC, resolution, IPS flag, column/row offsets, SPI
+else follows from it.** Driver IC, resolution, column/row offsets, SPI
 clock, colour order, inversion and backlight polarity all live in a built-in
 table. The GPIOs follow the MCU. So a program that shows text on a 2.4 inch
 screen and one that shows text on a 1.9 inch screen differ by exactly one token.
@@ -32,8 +32,11 @@ screen and one that shows text on a 1.9 inch screen differ by exactly one token.
    `SPI.begin()`, no `tft.init()`, no `Arduino_ESP32SPI(...)`, no
    `pinMode(BL, OUTPUT)`, no `analogWrite()` / `ledcAttach()` on the backlight.
    `display.begin()` does all of it.
-3. **Always write `auto *gfx = display.gfx();`** — never `Arduino_GFX *gfx`.
-   See "Why `auto`" below. This is a rule, not a style preference.
+3. **Draw on `display` itself** — `display.fillScreen(LB_BLACK)`. There is no
+   `gfx()` on Arduino any more, and no Arduino_GFX underneath: the panel
+   driver is the library's own. Code that calls `display.gfx()` or
+   `setCursor()`/`print()` is written for an older version and will not
+   compile.
 4. **Only pass the panel constant to the constructor.** Never a width, height,
    driver name, offset or SPI speed. `LB_Display display(LB_TFT_24);` is the
    entire configuration.
@@ -45,13 +48,13 @@ screen and one that shows text on a 1.9 inch screen differ by exactly one token.
 7. **Custom wiring starts from the default**: `LB_Wiring pins = LB_WIRING;`,
    then change only what differs. Never fill an `LB_Wiring` from scratch — the
    `spiHost` field is a bus number whose meaning differs per chip.
-8. **`setWiring()`, `setSpiHz()`, and `setColorOrder()` on ST7735 must be called
-   before `begin()`.** Everything else works at any time.
+8. **`setWiring()` and `setSpiHz()` must be called before `begin()`.**
+   Everything else works at any time.
 9. **ESP32 and ESP32-S3 only.** This library does not build for AVR (Uno, Nano),
    RP2040, STM32 or ESP8266. If the customer names one of those, stop and say
    so rather than producing code that cannot compile.
 10. **Do not mix the two language APIs.** Arduino is C++ (`display.backlight(255)`,
-    `gfx->fillScreen(BLACK)`); MicroPython is Python (`d.backlight(255)`,
+    `display.fillScreen(LB_BLACK)`); MicroPython is Python (`d.backlight(255)`,
     `tft.fill(BLACK)`). Decide which one the customer is on before writing a
     line — ask if it is not obvious.
 
@@ -158,26 +161,28 @@ void setup() {
     Serial.println("Display did not start — check the ribbon cable and DC.");
     return;
   }
-  display.backlight(255);
+  // begin() has already turned the backlight on at full.
 
-  auto *gfx = display.gfx();        // auto, always
-  gfx->fillScreen(BLACK);
-  gfx->setTextColor(WHITE);
-  gfx->setTextSize(2);
-  gfx->setCursor(10, 10);
-  gfx->print("Hello");
+  display.fillScreen(LB_BLACK);
+  display.setTextColor(LB_WHITE);
+  display.setTextSize(2);
+  display.drawString("Hello", 10, 10);
+  display.flush();                  // no-op without a framebuffer; always call it
 }
 
 void loop() {}
 ```
 
-### Why `auto`
+### One API for every Lonely Binary display
 
-`gfx()` is declared as returning `Arduino_GFX *`, so writing that type out
-compiles today and you will be tempted to. Don't. On an e-paper panel `gfx()`
-returns a `GxEPD2_GFX`, which shares **no base class** with `Arduino_GFX` — the
-two only agree on method names. Code written with `auto` compiles against both;
-code with the type spelled out forks the day the customer plugs in e-paper.
+`LB_Display` is an `LB_Canvas` — the drawing API from the *Lonely Binary GFX*
+library, which Lonely Binary VGA and e-paper use too. A function written
+against `LB_Canvas &` runs unchanged on all of them:
+
+```cpp
+void drawGauge(LB_Canvas &c, float value);   // TFT, VGA and e-paper
+drawGauge(display, 42.0f);
+```
 
 ### API
 
@@ -185,37 +190,42 @@ code with the type spelled out forks the day the customer plugs in e-paper.
 |---|---|
 | `LB_Display display(LB_TFT_24)` | The panel constant is the entire configuration. |
 | `begin(bool useCanvas = false)` | Brings up SPI, the panel and the backlight PWM, and turns the backlight on. Returns `false` only if the panel driver refuses to start — almost always a wiring fault, DC first. |
-| `gfx()` | The drawing surface. Assign to `auto *`. |
+| `pushImage(x, y, w, h, px)` | A block of raw RGB565 pixels (`uint16_t`). Into the framebuffer if there is one, else straight to the panel. |
+| `begun()` | Whether `begin()` has brought the panel up. |
 | `backlight(0..255)` | PWM on every panel. Active-high vs active-low comes from the panel table; the sketch never needs to know which. |
 | `flush()` | Pushes the framebuffer. No-op without a canvas, so always safe to call. |
 | `hasCanvas()` | Whether `begin(true)` actually got a framebuffer. |
 | `framebuffer()` | The raw RGB565 buffer, or `nullptr`. LVGL renders straight into this. |
-| `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. |
+| `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. With a framebuffer only 0 ↔ 2 and 1 ↔ 3 are allowed. |
 | `rotation()`, `width()`, `height()` | Current state, rotation included. |
 | `setWiring(pins)` | Your own GPIOs. **Before `begin()`.** |
 | `setSpiHz(hz)` | Override the panel's SPI clock. **Before `begin()`**; `0` restores the default. |
-| `setColorOrder(order)` | `LB_Display::COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time, **except on ST7735 where it must precede `begin()`**. Returns `false` if it could not be applied. |
-| `setInverted(bool)` | Flip the panel's inversion. Any time. |
+| `setColorOrder(order)` | `LB_Display::COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time, before or after `begin()`. |
+| `setInverted(bool)` | Set the panel's inversion. Any time, before or after `begin()`. |
 | `setBacklightActiveLow(bool)` | Flip the backlight polarity. Any time. |
-| `panel()` | The panel table entry — `->name`, `->id`, `->width`, `->height`. |
+| `panelDef()` | The panel table entry — `->name`, `->id`, `->width`, `->height`. |
 | `selfTest()` | Colour bars, backlight sweep, panel identity. The "does my wiring work" check. |
 | `printInfo()` | The same details to Serial. Ask for this output when diagnosing. |
 
-Drawing itself is the **Arduino_GFX** API (Adafruit_GFX-compatible names):
-`fillScreen`, `fillRect`, `drawRect`, `drawLine`, `drawCircle`, `fillCircle`,
-`drawPixel`, `setCursor`, `setTextColor`, `setTextSize`, `setFont`, `print`,
-`println`, `printf`, `drawBitmap`, `draw16bitRGBBitmap`.
+Drawing, all on `display`: `fillScreen`, `drawPixel`, `drawFastHLine`,
+`drawFastVLine`, `drawLine`, `drawRect`, `fillRect`, `drawRoundRect`,
+`fillRoundRect`, `drawCircle`, `fillCircle`, `drawTriangle`, `fillTriangle`,
+`setFont`, `setTextColor(fg)` / `setTextColor(fg, bg)`, `setTextSize`,
+`drawString(str, x, y)`, `textWidth`, `fontHeight`, `drawRGB565`, `drawJpg`.
+There is no `setCursor`/`print`/`printf`: format with `snprintf` into a buffer
+and pass it to `drawString`. Text is UTF-8.
 
 ### Colours
 
-`BLACK WHITE RED GREEN BLUE YELLOW MAGENTA CYAN ORANGE LIME` are available
-unprefixed. GFX Library 1.6.5 renamed these to `RGB565_*`; the compatibility
-shim lives in the library so sketches did not have to change.
+Drawing calls take `LB_BLACK`, `LB_WHITE`, `LB_RED`, `LB_GREEN`, `LB_BLUE`,
+`LB_YELLOW`, `LB_MAGENTA`, `LB_CYAN`, … (type `lb_color_t`, from Lonely Binary
+GFX).
 
-`LB_BLACK`, `LB_RED`, … `LB_GREY` are always available and never collide — use
-these if the sketch defines its own colour names. Define `LB_NO_LEGACY_COLORS`
-before the include to suppress the bare names. For anything else:
-`gfx->color565(r, g, b)`.
+The bare names `BLACK WHITE RED GREEN BLUE YELLOW MAGENTA CYAN ORANGE LIME`
+are raw RGB565 `uint16_t` values, only for `pushImage()` and `framebuffer()`.
+**Never pass a bare name to a drawing call, or an `LB_` name into a pixel
+buffer** — both compile and both give wrong colours. Define
+`LB_NO_LEGACY_COLORS` before the include to suppress the bare names.
 
 ### Recipe: a value that updates without flicker
 
@@ -227,18 +237,20 @@ to avoid it, in order of preference:
 //    each glyph, so the old digits are overwritten rather than cleared.
 //    Pad to a fixed width or "9" will leave the "0" of a previous "10" behind.
 void loop() {
-  auto *gfx = display.gfx();
-  gfx->setTextColor(WHITE, BLACK);
-  gfx->setTextSize(3);
-  gfx->setCursor(10, 40);
-  gfx->printf("%5.1f C", readTemperature());
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%5.1f C", readTemperature());
+  display.setTextColor(LB_WHITE, LB_BLACK);
+  display.setTextSize(3);
+  display.drawString(buf, 10, 40);
+  display.flush();
   delay(500);
 }
 ```
 
 ```cpp
 // 2. A framebuffer: draw the whole screen freely, then push it in one go.
-//    Needs PSRAM (ESP32-S3). If the allocation fails the library says so on
+//    Needs width x height x 2 bytes: PSRAM on the larger panels, internal RAM
+//    is enough up to about 128 x 160. If the allocation fails the library says so on
 //    Serial and draws direct instead, so begin(true) is always safe to ask for
 //    — check hasCanvas() if the difference matters to you.
 void setup() {
@@ -247,10 +259,10 @@ void setup() {
 }
 
 void loop() {
-  auto *gfx = display.gfx();
-  gfx->fillScreen(BLACK);
-  gfx->setCursor(10, 40);
-  gfx->print(readTemperature());
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%.1f", readTemperature());
+  display.fillScreen(LB_BLACK);
+  display.drawString(buf, 10, 40);
   display.flush();          // nothing appears until this call
   delay(500);
 }
@@ -258,8 +270,8 @@ void loop() {
 
 With a canvas, **`setRotation()` cannot switch between portrait and landscape** —
 the framebuffer was allocated the other way round, so the library refuses and
-logs to Serial. Set the rotation before `begin(true)`, or use `begin()` without
-a canvas.
+logs to Serial. 0 ↔ 2 and 1 ↔ 3 work. For a quarter turn, use `begin()`
+without a canvas.
 
 ### Recipe: the customer's own wiring
 
