@@ -23,7 +23,7 @@
 class LB_TFTPanel : public LB_Panel
 {
 public:
-  void attach(LB_TFT *tft, uint16_t *fb)
+  void attach(LB_Screen *tft, uint16_t *fb)
   {
     _tft = tft;
     _fb = fb;
@@ -45,7 +45,7 @@ public:
 
   void flush(lb_flush_t = LB_FLUSH_FULL) override
   {
-    if (_tft && _fb) _tft->pushImage(0, 0, _tft->width(), _tft->height(), _fb);
+    if (_tft && _fb) _tft->flushFramebuffer(_fb);
   }
 
   /* The panel rotates with one MADCTL write, so the canvas must not also
@@ -54,6 +54,6 @@ public:
   void setPanelRotation(uint8_t) override {} /* LB_Display::setRotation owns this */
 
 private:
-  LB_TFT *_tft = nullptr;
+  LB_Screen *_tft = nullptr;
   uint16_t *_fb = nullptr;
 };
