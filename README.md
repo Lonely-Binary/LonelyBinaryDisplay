@@ -204,6 +204,80 @@ Lonely Binary GFX). The bare names `BLACK`, `RED`, … are raw RGB565 values, fo
 `pushImage()` and `framebuffer()` only — never pass one to a drawing call, or
 the other way round. Define `LB_NO_LEGACY_COLORS` to suppress the bare names.
 
+### Touch
+
+A touch panel — the constants ending `_CTP` (capacitive) or `_RTP` (resistive)
+— brings up its touch controller in `begin()`, and `setRotation()` keeps the
+touch coordinates turned with the picture. Include the driver header to enable
+it:
+
+```cpp
+#include <LonelyBinaryDisplay.h>
+#include <LB_TouchGT911.h>              // the controller on LB_SQUARE_392_CTP
+
+LB_Display display(LB_SQUARE_392_CTP);
+
+void loop() {
+  int16_t x, y;
+  if (display.touch() && display.touch()->getTouch(&x, &y))
+    display.fillCircle(x, y, 3, LB_RED);
+}
+```
+
+`touch()` is `nullptr` on a panel without touch, or if the controller did not
+answer (`begin()` says which on Serial). The Lonely Binary LVGL library
+includes the driver header itself and wires touch into LVGL, so an LVGL sketch
+needs neither line.
+
+Why the include: the GT911 is on I2C through `Wire`, and Arduino links every
+library that any file of this one includes. Keeping the driver header-only and
+opt-in means a sketch without touch does not carry `Wire` (about 22 KB).
+
+The driver also works on its own, for touch on your own wiring:
+
+```cpp
+LB_TouchGT911 touch(21 /* SDA */, 22 /* SCL */, 18 /* INT */, 19 /* RST */);
+touch.begin();          // false = the chip did not answer
+touch.setRotation(0);   // same value as display.setRotation()
+```
+
+| | |
+|---|---|
+| `begin()` | Reset the chip (when RST is wired) and find it at 0x5D or 0x14. The resolution comes from the chip's own configuration, so there is nothing to calibrate. |
+| `getTouch(&x, &y)` | The first finger. `false` when nothing is touching. |
+| `read(points, max)` | Every finger (GT911: up to 5), as `LB_TouchPoint { x, y, size, id }`. Returns how many. |
+| `setRotation(0..3)` | Keep it in step with the display, and the points follow the picture. |
+| `setOrientation(swapXY, flipX, flipY)` | How the touch layer sits relative to display rotation 0. The panel table carries this; only for a panel it does not know. |
+
+Measured on the 3.92" square (`LB_SQUARE_392_CTP`), classic ESP32, SDA 21
+SCL 22 INT 18 RST 19: the GT911 reports 320 x 320 in the same orientation as
+display rotation 0. All four rotations were checked on hardware, 5/5 targets
+hit in each.
+
+### The square series (8-bit parallel)
+
+The square panels are driven over an 8-bit parallel bus rather than SPI, on a
+breakout of their own, so their pins are a separate set — `LB_WIRING_PAR8`,
+picked automatically by the panel constant. Override it the same way as the
+SPI wiring:
+
+```cpp
+LB_WiringPar8 pins = LB_WIRING_PAR8;
+pins.rst = -1;                // panel reset not wired on this board
+display.setWiring(pins);
+```
+
+Default pins (proposed — the breakout is not final yet):
+
+| | D0–D7 | WR | DC | RST | Backlight | Touch SDA / SCL / INT / RST |
+|---|---|---|---|---|---|---|
+| ESP32-S3 | 4, 5, 6, 7, 15, 16, 17, 18 | 8 | 9 | 42 | 41 | 1 / 2 / 40 / 39 |
+| classic ESP32 | 5, 17, 16, 15, 13, 26, 14, 27 | 4 | 23 | 33 | 32 | 21 / 22 / 18 / 19 |
+
+CS is tied low and RD high on the board. The data lines, WR and DC are all below
+GPIO 32 on purpose: the bus sets a whole byte with one register write, and pins
+above 31 would need a second.
+
 ---
 
 ## MicroPython

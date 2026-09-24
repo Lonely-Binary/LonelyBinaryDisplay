@@ -59,6 +59,43 @@ wiring:
     mp_spi_id: 2        # MicroPython: SPI(2) is VSPI on its native pins
     psram: false
 
+# ── Parallel wiring (square series) ──────────────────────────────────────────
+# The square panels are 8080 8-bit parallel with an I2C touch controller, on a
+# breakout of their own. Same rule as above: the pins depend on the MCU, never
+# on the panel.
+#
+# PROPOSED 2026-09-24 — the breakout is not built yet. Rules behind the choice:
+#   * D0-D7, WR and DC all below GPIO 32. The bus writes one set/clear register
+#     per byte; pins above 31 live in a second register and cost a second write.
+#   * No boot-strapping pins on the data bus. The bench rig had D5 on GPIO12,
+#     which picks the flash voltage at reset - moved to 26 here.
+#   * Backlight and panel reset keep the roles they have on the SPI breakout
+#     (ESP32: BL 32; S3: RST 42, BL 41).
+#   * Touch on the MCU's usual I2C pins, so a customer's own I2C sensor can
+#     share the bus through Wire.
+# CS is tied low and RD tied high on the board: the bus has no other device.
+wiring_par8:
+  esp32s3:
+    data: [4, 5, 6, 7, 15, 16, 17, 18]   # D0..D7, one run of the left header
+    wr: 8
+    dc: 9
+    rst: 42
+    backlight: 41
+    touch_sda: 1
+    touch_scl: 2
+    touch_int: 40
+    touch_rst: 39
+  esp32:
+    data: [5, 17, 16, 15, 13, 26, 14, 27]
+    wr: 4
+    dc: 23
+    rst: 33
+    backlight: 32
+    touch_sda: 21
+    touch_scl: 22
+    touch_int: 18
+    touch_rst: 19
+
 # ── Panels ───────────────────────────────────────────────────────────────────
 # product: true  = something Lonely Binary sells. These are the only entries a
 #                  customer should ever have to look at; they pick by the size
@@ -267,6 +304,37 @@ panels:
     notes: >-
       Same NV3007 silicon as the 1.68 inch but a different voltage/gamma table.
       Without init_ops it would inherit the 1.68 inch settings and look wrong.
+
+  # ── Square LCD series (8-bit parallel, touch) ──────────────────────────────
+  #
+  # bus: par8 selects wiring_par8 above. spi_hz does not apply.
+  # touch: the controller and how its axes sit relative to rotation 0. The
+  # controller's own resolution is read from the chip, so it is not here.
+  # Suffix _ctp = capacitive touch, _rtp = resistive touch.
+
+  - id: square_392_ctp
+    product: true
+    name: '3.92 inch square, capacitive touch'
+    family: square-lcd
+    driver: ILI9488
+    bus: par8
+    width: 320          # verified 2026-09-24
+    height: 320         # verified 2026-09-24
+    rotation: 0
+    offsets: [0, 0, 0, 160]   # verified: glass faces controller RAM rows 0-319
+    bgr: true           # verified 2026-09-24
+    invert: true        # verified 2026-09-24
+    backlight_active_low: false   # UNVERIFIED - the bench rig had no BL pin
+    touch:
+      controller: GT911
+      swap_xy: false    # verified 2026-09-24, all four rotations 5/5
+      flip_x: false
+      flip_y: false
+    notes: >-
+      Active area 71.14 x 69.82 mm, so pixels are 0.222 x 0.218 mm: 1.9% taller
+      than wide. Circles come out 2% oval, below what the eye notices. Colour,
+      offsets, all four rotations and touch in all four rotations measured on
+      the classic-ESP32 bench rig (bench wiring, not the proposed breakout).
 
   # ── Panels we do NOT sell ──────────────────────────────────────────────────
   #
