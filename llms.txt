@@ -97,19 +97,20 @@ there is never more than one entry for a size. Everything else in this
 table follows from the constant — do not pass any of it to the library by
 hand.
 
-| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | SPI clock | Backlight |
-|---|---|---|---|---|---|---|
-| 0.96 inch | `LB_TFT_096` | `TFT_096` | 80 x 160 | ST7735 | 20 MHz | active low |
-| 1.8 inch | `LB_TFT_18` | `TFT_18` | 128 x 160 | ST7735 | 20 MHz | active high |
-| 2.0 inch | `LB_TFT_20` | `TFT_20` | 240 x 320 | ST7789 | 40 MHz | active high |
-| 2.4 inch | `LB_TFT_24` | `TFT_24` | 240 x 320 | ST7789 | 40 MHz | active high |
-| 2.8 inch | `LB_TFT_28` | `TFT_28` | 240 x 320 | ST7789 | 40 MHz | active high |
-| 3.5 inch | `LB_TFT_35` | `TFT_35` | 320 x 480 | ST7796 | 40 MHz | active high |
-| 1.14 inch | `LB_NARROW_114` | `NARROW_114` | 240 x 135 | ST7789 | 8 MHz | active low |
-| 1.68 inch | `LB_NARROW_168` | `NARROW_168` | 428 x 142 | NV3007 | 8 MHz | active low |
-| 1.9 inch | `LB_NARROW_19` | `NARROW_19` | 320 x 170 | ST7789 | 8 MHz | active low |
-| 2.25 inch | `LB_NARROW_225` | `NARROW_225` | 284 x 76 | ST7789 | 8 MHz | active low |
-| 2.79 inch | `LB_NARROW_279` | `NARROW_279` | 428 x 142 | NV3007 | 20 MHz | active low |
+| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | Bus | Touch | Backlight |
+|---|---|---|---|---|---|---|---|
+| 0.96 inch | `LB_TFT_096` | `TFT_096` | 80 x 160 | ST7735 | SPI 20 MHz | — | active low |
+| 1.8 inch | `LB_TFT_18` | `TFT_18` | 128 x 160 | ST7735 | SPI 20 MHz | — | active high |
+| 2.0 inch | `LB_TFT_20` | `TFT_20` | 240 x 320 | ST7789 | SPI 40 MHz | — | active high |
+| 2.4 inch | `LB_TFT_24` | `TFT_24` | 240 x 320 | ST7789 | SPI 40 MHz | — | active high |
+| 2.8 inch | `LB_TFT_28` | `TFT_28` | 240 x 320 | ST7789 | SPI 40 MHz | — | active high |
+| 3.5 inch | `LB_TFT_35` | `TFT_35` | 320 x 480 | ST7796 | SPI 40 MHz | — | active high |
+| 1.14 inch | `LB_NARROW_114` | `NARROW_114` | 240 x 135 | ST7789 | SPI 8 MHz | — | active low |
+| 1.68 inch | `LB_NARROW_168` | `NARROW_168` | 428 x 142 | NV3007 | SPI 8 MHz | — | active low |
+| 1.9 inch | `LB_NARROW_19` | `NARROW_19` | 320 x 170 | ST7789 | SPI 8 MHz | — | active low |
+| 2.25 inch | `LB_NARROW_225` | `NARROW_225` | 284 x 76 | ST7789 | SPI 8 MHz | — | active low |
+| 2.79 inch | `LB_NARROW_279` | `NARROW_279` | 428 x 142 | NV3007 | SPI 20 MHz | — | active low |
+| 3.92 inch square, capacitive touch | `LB_SQUARE_392_CTP` | not supported | 320 x 320 | ILI9488 | 8-bit parallel | GT911 (capacitive) | active high |
 
 **Screen size is the size after the panel's default rotation**, which is
 what `width()` / `height()` return and what you should lay a UI out
@@ -131,9 +132,9 @@ product. Values are measured on one sample; another sample of the same
 controller may well need `setColorOrder()` / `setInverted()` /
 `setBacklightActiveLow()`.
 
-| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | SPI clock | Backlight |
-|---|---|---|---|---|---|---|
-| ILI9341 | `LB_ILI9341_240X320` | not supported | 240 x 320 | ILI9341 | 40 MHz | active high |
+| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | Bus | Touch | Backlight |
+|---|---|---|---|---|---|---|---|
+| ILI9341 | `LB_ILI9341_240X320` | not supported | 240 x 320 | ILI9341 | SPI 40 MHz | — | active high |
 
 <!-- END GENERATED PANEL TABLE -->
 
@@ -198,7 +199,8 @@ drawGauge(display, 42.0f);
 | `framebuffer()` | The raw RGB565 buffer, or `nullptr`. LVGL renders straight into this. |
 | `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. With a framebuffer only 0 ↔ 2 and 1 ↔ 3 are allowed. |
 | `rotation()`, `width()`, `height()` | Current state, rotation included. |
-| `setWiring(pins)` | Your own GPIOs. **Before `begin()`.** |
+| `setWiring(pins)` | Your own GPIOs. **Before `begin()`.** Takes `LB_Wiring` (SPI panels) or `LB_WiringPar8` (the square series, 8-bit parallel); start from `LB_WIRING` / `LB_WIRING_PAR8` and change only what differs. |
+| `touch()` | The touch controller of a `_CTP` / `_RTP` panel, or `nullptr`. Needs `#include <LB_TouchGT911.h>` in the sketch (the LVGL library includes it itself). `touch()->getTouch(&x, &y)` returns `true` while a finger is down, in screen coordinates that follow `setRotation()`. `touch()->read(points, max)` gives every finger. |
 | `setSpiHz(hz)` | Override the panel's SPI clock. **Before `begin()`**; `0` restores the default. |
 | `setColorOrder(order)` | `LB_Display::COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time, before or after `begin()`. |
 | `setInverted(bool)` | Set the panel's inversion. Any time, before or after `begin()`. |

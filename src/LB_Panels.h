@@ -9,11 +9,20 @@ enum LB_Driver : uint8_t {
   LB_DRV_ST7796,
   LB_DRV_NV3007,
   LB_DRV_ILI9341,
+  LB_DRV_ILI9488,
 };
 
 // Panels whose controller needs a vendor init table that differs from the
 // driver's built-in default (same silicon, different voltage/gamma).
 enum LB_InitOps : uint8_t { LB_INIT_NONE, LB_INIT_NV3007_279 };
+
+// Which wiring set the panel uses: LB_WIRING (SPI) or LB_WIRING_PAR8.
+enum LB_Bus : uint8_t { LB_BUS_SPI, LB_BUS_PAR8 };
+
+enum LB_TouchCtl : uint8_t {
+  LB_TOUCH_NONE,
+  LB_TOUCH_GT911,
+};
 
 struct LB_PanelDef {
   const char      *id;
@@ -33,24 +42,31 @@ struct LB_PanelDef {
   int32_t          spiHz;
   bool             blActiveLow; // LOW turns the backlight ON
   LB_InitOps       initOps;
+  // Appended, so older aggregate initialisers still compile (as SPI, no touch).
+  LB_Bus           bus;
+  LB_TouchCtl      touch;
+  bool             touchSwapXY; // touch axes relative to display rotation 0
+  bool             touchFlipX;
+  bool             touchFlipY;
 };
 
 static const LB_PanelDef LB_PANELS[] = {
-  { "tft_096", "0.96 inch", LB_DRV_ST7735, 80, 160, 0, true, false, false, false, 24, 0, 24, 0, 20000000, true, LB_INIT_NONE },
-  { "tft_18", "1.8 inch", LB_DRV_ST7735, 128, 160, 0, false, true, true, true, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE },
-  { "tft_20", "2.0 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
-  { "tft_24", "2.4 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
-  { "tft_28", "2.8 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
-  { "tft_35", "3.5 inch", LB_DRV_ST7796, 320, 480, 0, true, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
-  { "narrow_114", "1.14 inch", LB_DRV_ST7789, 135, 240, 1, false, true, false, false, 52, 40, 53, 40, 8000000, true, LB_INIT_NONE },
-  { "narrow_168", "1.68 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 8000000, true, LB_INIT_NONE },
-  { "narrow_19", "1.9 inch", LB_DRV_ST7789, 170, 320, 1, false, true, false, false, 35, 0, 35, 0, 8000000, true, LB_INIT_NONE },
-  { "narrow_225", "2.25 inch", LB_DRV_ST7789, 76, 284, 1, false, false, false, false, 82, 18, 82, 18, 8000000, true, LB_INIT_NONE },
-  { "narrow_279", "2.79 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 20000000, true, LB_INIT_NV3007_279 },
-  { "ili9341_240x320", "ILI9341 240x320", LB_DRV_ILI9341, 240, 320, 0, true, false, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE },
+  { "tft_096", "0.96 inch", LB_DRV_ST7735, 80, 160, 0, true, false, false, false, 24, 0, 24, 0, 20000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "tft_18", "1.8 inch", LB_DRV_ST7735, 128, 160, 0, false, true, true, true, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "tft_20", "2.0 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "tft_24", "2.4 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "tft_28", "2.8 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "tft_35", "3.5 inch", LB_DRV_ST7796, 320, 480, 0, true, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "narrow_114", "1.14 inch", LB_DRV_ST7789, 135, 240, 1, false, true, false, false, 52, 40, 53, 40, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "narrow_168", "1.68 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "narrow_19", "1.9 inch", LB_DRV_ST7789, 170, 320, 1, false, true, false, false, 35, 0, 35, 0, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "narrow_225", "2.25 inch", LB_DRV_ST7789, 76, 284, 1, false, false, false, false, 82, 18, 82, 18, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "narrow_279", "2.79 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 20000000, true, LB_INIT_NV3007_279, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
+  { "square_392_ctp", "3.92 inch square, capacitive touch", LB_DRV_ILI9488, 320, 320, 0, true, true, false, false, 0, 0, 0, 160, 0, false, LB_INIT_NONE, LB_BUS_PAR8, LB_TOUCH_GT911, false, false, false },
+  { "ili9341_240x320", "ILI9341 240x320", LB_DRV_ILI9341, 240, 320, 0, true, false, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false },
 };
 
-#define LB_PANEL_COUNT 12
+#define LB_PANEL_COUNT 13
 
 // Pass one of these to LB_Display. Changing this constant is the only
 // edit needed to swap panels — everything else is inherited.
@@ -67,8 +83,9 @@ static const LB_PanelDef LB_PANELS[] = {
 #define LB_NARROW_19       (&LB_PANELS[8])   // 1.9 inch 170x320 ST7789
 #define LB_NARROW_225      (&LB_PANELS[9])   // 2.25 inch 76x284 ST7789
 #define LB_NARROW_279      (&LB_PANELS[10])   // 2.79 inch 142x428 NV3007
+#define LB_SQUARE_392_CTP  (&LB_PANELS[11])   // 3.92 inch square, capacitive touch 320x320 ILI9488
 
 // ── Panels we do not sell, but can drive ─────────────────────
 // Named by controller, not by size, so they cannot be confused with
 // the products above. If you bought a display from us it is up there.
-#define LB_ILI9341_240X320 (&LB_PANELS[11])   // ILI9341 240x320
+#define LB_ILI9341_240X320 (&LB_PANELS[12])   // ILI9341 240x320

@@ -22,6 +22,7 @@ static const LB_Ctl kCtl[] = {
   /* ST7796  */ { 120, false, false },
   /* NV3007  */ { 120, false, true  },
   /* ILI9341 */ { 150, false, false },
+  /* ILI9488 */ { 150, false, false },
 };
 
 static const uint8_t *initTable(const LB_PanelDef *p) {
@@ -30,6 +31,10 @@ static const uint8_t *initTable(const LB_PanelDef *p) {
     case LB_DRV_ST7789:  return LB_INITSEQ_ST7789;
     case LB_DRV_ST7796:  return LB_INITSEQ_ST7796;
     case LB_DRV_ILI9341: return LB_INITSEQ_ILI9341;
+    // The 8-bit parallel ILI9488 driver - 16-bit colour. Over SPI the ILI9488
+    // only takes 18-bit colour, which is a different init and a different
+    // pixel format; that is not what this table is.
+    case LB_DRV_ILI9488: return LB_INITSEQ_ILI9488;
     case LB_DRV_NV3007:
       // The 2.79" is the same silicon as the 1.68" but needs its own
       // voltage/gamma table — without it the panel comes up looking wrong.
@@ -53,8 +58,9 @@ static uint8_t lb_madctl(LB_Driver drv, uint8_t r, bool bgr) {
       case 3:  bits = MX | MV; break;
       default: bits = MX | MY; break;
     }
-  } else if (drv == LB_DRV_ILI9341) {
+  } else if (drv == LB_DRV_ILI9341 || drv == LB_DRV_ILI9488) {
     // A third mapping again — ILI9341 agrees with neither family above.
+    // ILI9488 uses the same one.
     switch (r & 3) {
       case 1:  bits = MV;           break;
       case 2:  bits = MY;           break;

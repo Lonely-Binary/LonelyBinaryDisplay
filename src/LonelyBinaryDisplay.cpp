@@ -10,6 +10,7 @@
 #define LB_BL_PWM_CHANNEL 0
 
 LB_Display::~LB_Display() {
+  delete _touch;
   delete _tft;
   delete _bus;
   free(_fb);
@@ -38,14 +39,25 @@ void LB_Display::setWiring(const LB_Wiring &wiring) {
   _customWiring = true;
 }
 
+void LB_Display::setWiring(const LB_WiringPar8 &wiring) {
+  if (_tft) return;
+  _wiringPar8 = wiring;
+  _customWiring = true;
+}
+
 bool LB_Display::begin(bool useCanvas) {
   if (_tft) return true;  // already up
 
   const int32_t spiHz = _spiHzOverride ? _spiHzOverride : _panel->spiHz;
 
-  _bus = new LB_TFTSpiBus(_wiring.dc, _wiring.cs, _wiring.sclk, _wiring.mosi,
-                          _wiring.spiHost);
-  _tft = new LB_TFT(_bus, _panel, _wiring.rst);
+  if (par8()) {
+    _bus = new LB_TFTPar8Bus(_wiringPar8.data, _wiringPar8.wr, _wiringPar8.dc);
+    _tft = new LB_TFT(_bus, _panel, _wiringPar8.rst);
+  } else {
+    _bus = new LB_TFTSpiBus(_wiring.dc, _wiring.cs, _wiring.sclk, _wiring.mosi,
+                            _wiring.spiHost);
+    _tft = new LB_TFT(_bus, _panel, _wiring.rst);
+  }
   // Colour order and inversion go in here, so anything set before begin()
   // is what the panel comes up with. _inverted starts as the panel table's
   // value (see the constructor) - if it started as false, every panel whose
@@ -55,6 +67,8 @@ bool LB_Display::begin(bool useCanvas) {
                      "DC in particular."));
     delete _tft;
     _tft = nullptr;
+    delete _bus;
+    _bus = nullptr;
     return false;
   }
 
@@ -87,7 +101,30 @@ bool LB_Display::begin(bool useCanvas) {
   // Hand the driver and the framebuffer (if any) to the LB_Panel adapter, so
   // LB_Canvas draws through it.
   attach(_tft, _fb);
+  touchBegin();
   return true;
+}
+
+void LB_Display::touchBegin() {
+  if (_panel->touch == LB_TOUCH_NONE) return;
+  // Touch pins live with the parallel wiring: the square series is the only
+  // one with touch so far. A touch SPI panel would add its pins to LB_Wiring.
+  const LB_TouchPins pins = {_wiringPar8.touchSda, _wiringPar8.touchScl,
+                             _wiringPar8.touchInt, _wiringPar8.touchRst};
+  _touch = LB_Touch::create(_panel->touch, pins);
+  if (!_touch) {
+    Serial.println(F("[LB_Display] this panel has touch - #include <LB_TouchGT911.h> "
+                     "to use it. The display works without."));
+    return;
+  }
+  _touch->setOrientation(_panel->touchSwapXY, _panel->touchFlipX, _panel->touchFlipY);
+  _touch->setRotation(_tft->rotation());
+  if (!_touch->begin()) {
+    Serial.println(F("[LB_Display] touch controller did not answer - check SDA/SCL. "
+                     "The display works without."));
+    delete _touch;
+    _touch = nullptr;
+  }
 }
 
 void LB_Display::pushImage(int16_t x, int16_t y, int16_t w, int16_t h,
@@ -124,6 +161,7 @@ void LB_Display::setRotation(uint8_t r) {
   }
   _tft->setRotation(r);
   LB_Canvas::setRotation(r);  /* keep the canvas's idea of rotation in step */
+  if (_touch) _touch->setRotation(r);
 }
 
 // ─── Backlight ───────────────────────────────────────────────────────────────
@@ -133,12 +171,12 @@ void LB_Display::backlightBegin() {
   // Every panel in the range dims, so the backlight is always driven by LEDC
   // rather than digitalWrite. backlight(255) is simply full brightness, which
   // makes the on/off case a special case of the same call.
-  if (_wiring.backlight < 0) return;
+  if (blPin() < 0) return;
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcAttach(_wiring.backlight, LB_BL_PWM_FREQ, LB_BL_PWM_BITS);
+  ledcAttach(blPin(), LB_BL_PWM_FREQ, LB_BL_PWM_BITS);
 #else
   ledcSetup(LB_BL_PWM_CHANNEL, LB_BL_PWM_FREQ, LB_BL_PWM_BITS);
-  ledcAttachPin(_wiring.backlight, LB_BL_PWM_CHANNEL);
+  ledcAttachPin(blPin(), LB_BL_PWM_CHANNEL);
 #endif
   _blReady = true;
 }
@@ -150,7 +188,7 @@ void LB_Display::setBacklightActiveLow(bool activeLow) {
 }
 
 void LB_Display::backlight(uint8_t level) {
-  if (!_blReady || _wiring.backlight < 0) return;
+  if (!_blReady || blPin() < 0) return;
 
   // Active-low panels want a LOW duty cycle to be bright. Getting this
   // backwards is the classic "why is my screen dark at 255" bug — it is
@@ -158,7 +196,7 @@ void LB_Display::backlight(uint8_t level) {
   _blLevel = level;
   uint8_t duty = _blActiveLow ? (uint8_t)(255 - level) : level;
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcWrite(_wiring.backlight, duty);
+  ledcWrite(blPin(), duty);
 #else
   ledcWrite(LB_BL_PWM_CHANNEL, duty);
 #endif
@@ -168,24 +206,41 @@ void LB_Display::backlight(uint8_t level) {
 
 void LB_Display::printInfo(Print &out) const {
   static const char *kDrivers[] = {"ST7735", "ST7789", "ST7796", "NV3007",
-                                   "ILI9341"};
+                                   "ILI9341", "ILI9488"};
   out.println(F("---- Lonely Binary Display ----"));
   out.printf("Panel      : %s (%s)\n", _panel->name, _panel->id);
   out.printf("Driver IC  : %s\n", kDrivers[_panel->driver]);
   out.printf("Resolution : %dx%d  (native %dx%d, rotation %d)\n",
              width(), height(), _panel->width, _panel->height, _panel->rotation);
-  out.printf("SPI clock  : %ld Hz%s\n",
-             (long)(_spiHzOverride ? _spiHzOverride : _panel->spiHz),
-             _spiHzOverride ? "  (overridden)" : "");
+  if (par8())
+    out.println(F("Bus        : 8-bit parallel"));
+  else
+    out.printf("SPI clock  : %ld Hz%s\n",
+               (long)(_spiHzOverride ? _spiHzOverride : _panel->spiHz),
+               _spiHzOverride ? "  (overridden)" : "");
   out.printf("Backlight  : PWM, active %s%s%s\n",
              _blActiveLow ? "LOW" : "HIGH",
              _blPolarityForced ? " (forced)" : "",
-             _wiring.backlight < 0 ? "  (no pin — not driven)" : "");
+             blPin() < 0 ? "  (no pin — not driven)" : "");
   out.printf("Board      : %s%s\n", LB_WIRING_NAME,
              _customWiring ? "  (custom wiring)" : "");
-  out.printf("Pins       : CS=%d RST=%d DC=%d MOSI=%d SCLK=%d BL=%d\n",
-             _wiring.cs, _wiring.rst, _wiring.dc,
-             _wiring.mosi, _wiring.sclk, _wiring.backlight);
+  if (par8()) {
+    const LB_WiringPar8 &w = _wiringPar8;
+    out.printf("Pins       : D0-D7=%d,%d,%d,%d,%d,%d,%d,%d WR=%d DC=%d RST=%d BL=%d\n",
+               w.data[0], w.data[1], w.data[2], w.data[3], w.data[4], w.data[5],
+               w.data[6], w.data[7], w.wr, w.dc, w.rst, w.backlight);
+  } else {
+    out.printf("Pins       : CS=%d RST=%d DC=%d MOSI=%d SCLK=%d BL=%d\n",
+               _wiring.cs, _wiring.rst, _wiring.dc,
+               _wiring.mosi, _wiring.sclk, _wiring.backlight);
+  }
+  if (_panel->touch != LB_TOUCH_NONE) {
+    static const char *kTouch[] = {"none", "GT911"};
+    const LB_WiringPar8 &w = _wiringPar8;
+    out.printf("Touch      : %s %s  SDA=%d SCL=%d INT=%d RST=%d\n", kTouch[_panel->touch],
+               _touch ? "(running)" : "(not started)", w.touchSda, w.touchScl,
+               w.touchInt, w.touchRst);
+  }
   out.printf("Colour     : %s%s, %sinverted%s\n",
              colorOrderIsBGR() ? "BGR" : "RGB",
              _colorOrder == COLOR_AUTO ? "" : " (forced)",
@@ -228,7 +283,7 @@ void LB_Display::selfTest() {
   // 2. Backlight sweep. Every panel in the range dims, so this runs on all of
   //    them - and it is the quickest way to spot a polarity mistake, because a
   //    panel wired the other way round sweeps backwards.
-  if (_wiring.backlight >= 0) {
+  if (blPin() >= 0) {
     fillScreen(LB_WHITE);
     setTextColor(LB_BLACK);
     setTextSize(1);

@@ -41,8 +41,19 @@ BANNER = "GENERATED FROM panels.yaml BY tools/gen_panels.py — DO NOT EDIT"
 LLMS_BEGIN = "<!-- BEGIN GENERATED PANEL TABLE — panels.yaml via tools/gen_panels.py -->"
 LLMS_END = "<!-- END GENERATED PANEL TABLE -->"
 
-DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341"]
+DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341", "ILI9488"]  # append only: values are baked into sketches
 INIT_OPS = {None: "LB_INIT_NONE", "nv3007_279": "LB_INIT_NV3007_279"}
+BUSES = {"spi": "LB_BUS_SPI", "par8": "LB_BUS_PAR8"}
+TOUCH = ["NONE", "GT911"]  # append only, like DRIVERS
+TOUCH_KIND = {"GT911": "capacitive"}
+
+
+def bus_of(panel) -> str:
+    return panel.get("bus", "spi")
+
+
+def touch_of(panel) -> dict:
+    return panel.get("touch") or {}
 
 
 def const_name(panel) -> str:
@@ -100,6 +111,13 @@ def gen_header(doc) -> str:
         "// driver's built-in default (same silicon, different voltage/gamma).",
         "enum LB_InitOps : uint8_t { LB_INIT_NONE, LB_INIT_NV3007_279 };",
         "",
+        "// Which wiring set the panel uses: LB_WIRING (SPI) or LB_WIRING_PAR8.",
+        "enum LB_Bus : uint8_t { LB_BUS_SPI, LB_BUS_PAR8 };",
+        "",
+        "enum LB_TouchCtl : uint8_t {",
+    ] + [f"  LB_TOUCH_{t}," for t in TOUCH] + [
+        "};",
+        "",
         "struct LB_PanelDef {",
         "  const char      *id;",
         "  const char      *name;",
@@ -118,6 +136,12 @@ def gen_header(doc) -> str:
         "  int32_t          spiHz;",
         "  bool             blActiveLow; // LOW turns the backlight ON",
         "  LB_InitOps       initOps;",
+        "  // Appended, so older aggregate initialisers still compile (as SPI, no touch).",
+        "  LB_Bus           bus;",
+        "  LB_TouchCtl      touch;",
+        "  bool             touchSwapXY; // touch axes relative to display rotation 0",
+        "  bool             touchFlipX;",
+        "  bool             touchFlipY;",
         "};",
         "",
         f"static const LB_PanelDef LB_PANELS[] = {{",
@@ -128,16 +152,21 @@ def gen_header(doc) -> str:
             "  {{ \"{id}\", \"{name}\", LB_DRV_{drv}, {w}, {h}, {rot}, "
             "{bgr}, {inv}, {fx}, {fy}, "
             "{o0}, {o1}, {o2}, {o3}, {hz}, "
-            "{bla}, {ops} }},".format(
+            "{bla}, {ops}, {bus}, LB_TOUCH_{tc}, {tsw}, {tfx}, {tfy} }},".format(
                 id=p["id"], name=p["name"], drv=p["driver"],
                 w=p["width"], h=p["height"], rot=p["rotation"],
                 bgr=cbool(p.get("bgr")),
                 inv=cbool(p.get("invert")), fx=cbool(p.get("flip_x")),
                 fy=cbool(p.get("flip_y")),
                 o0=off[0], o1=off[1], o2=off[2], o3=off[3],
-                hz=p["spi_hz"],
+                hz=p.get("spi_hz", 0),
                 bla=cbool(p["backlight_active_low"]),
                 ops=INIT_OPS[p.get("init_ops")],
+                bus=BUSES[bus_of(p)],
+                tc=touch_of(p).get("controller", "NONE"),
+                tsw=cbool(touch_of(p).get("swap_xy")),
+                tfx=cbool(touch_of(p).get("flip_x")),
+                tfy=cbool(touch_of(p).get("flip_y")),
             )
         )
     L += ["};", "", f"#define LB_PANEL_COUNT {len(panels)}", ""]
@@ -204,7 +233,35 @@ def gen_wiring(doc) -> str:
         "#endif",
         "",
     ]
+    L += par8_wiring(doc)
     return "\n".join(L)
+
+
+def par8_wiring(doc):
+    w = doc["wiring_par8"]
+
+    def init(d):
+        return ("{ {" + ", ".join(str(x) for x in d["data"]) + "}, "
+                f"{d['wr']}, {d['dc']}, {d['rst']}, {d['backlight']}, "
+                f"{d['touch_sda']}, {d['touch_scl']}, {d['touch_int']}, {d['touch_rst']} }}")
+
+    return [
+        "// The square series is 8-bit parallel with I2C touch, on a breakout of its",
+        "// own. Picked by the panel's `bus`, so a sketch never chooses between these.",
+        "// CS is tied low and RD high on that board.",
+        "struct LB_WiringPar8 {",
+        "  int8_t data[8];   // D0..D7",
+        "  int8_t wr, dc, rst, backlight;",
+        "  int8_t touchSda, touchScl, touchInt, touchRst;",
+        "};",
+        "",
+        "#if defined(CONFIG_IDF_TARGET_ESP32S3)",
+        f"  static const LB_WiringPar8 LB_WIRING_PAR8 = {init(w['esp32s3'])};",
+        "#else",
+        f"  static const LB_WiringPar8 LB_WIRING_PAR8 = {init(w['esp32'])};",
+        "#endif",
+        "",
+    ]
 
 
 # ── MicroPython ──────────────────────────────────────────────────────────────
@@ -227,6 +284,9 @@ def gen_python(doc) -> str:
         )
     L += ["}", "", "# The MicroPython driver takes a single xstart/ystart, so the offset pair", "# matching each panel's default rotation is pre-selected here.", ""]
 
+    # Parallel panels have no MicroPython driver yet, so they are left out
+    # rather than listed and then failing inside lb_display.
+    panels = [p for p in panels if bus_of(p) == "spi"]
     names = []
     for p in panels:
         off = p["offsets"]
@@ -283,16 +343,19 @@ def gen_llms_panels(doc) -> str:
 
     def row(p, label):
         cls = mp_cls(p)
-        mp = f"`{mp_name(p)}`" if cls in have else "not supported"
+        mp = f"`{mp_name(p)}`" if cls in have and bus_of(p) == "spi" else "not supported"
+        bus = f"SPI {mhz(p['spi_hz'])}" if bus_of(p) == "spi" else "8-bit parallel"
+        t = touch_of(p).get("controller")
+        touch = f"{t} ({TOUCH_KIND[t]})" if t else "—"
         return (
             f"| {label} | `{const_name(p)}` | {mp} | {screen_size(p)} | "
-            f"{p['driver']} | {mhz(p['spi_hz'])} | "
+            f"{p['driver']} | {bus} | {touch} | "
             f"{'active low' if p['backlight_active_low'] else 'active high'} |"
         )
 
     head = [
-        "| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | SPI clock | Backlight |",
-        "|---|---|---|---|---|---|---|",
+        "| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | Bus | Touch | Backlight |",
+        "|---|---|---|---|---|---|---|---|",
     ]
 
     products = [p for p in panels if p.get("product", True)]
