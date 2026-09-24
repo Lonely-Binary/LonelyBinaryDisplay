@@ -29,7 +29,8 @@
 #include "LB_Panels.h"
 
 struct LB_TouchPins {
-  int8_t sda, scl, intr, rst;   // -1 = not wired
+  int8_t sda, scl, intr, rst;     // I2C controllers. -1 = not wired
+  int8_t sck, miso, mosi, cs;     // SPI controllers
 };
 
 struct LB_TouchPoint {
@@ -64,6 +65,12 @@ class LB_Touch {
   void setOrientation(bool swapXY, bool flipX, bool flipY) {
     _swapXY = swapXY; _flipX = flipX; _flipY = flipY;
   }
+
+  // Resistive controllers report raw ADC counts, not pixels. The panel table
+  // carries the raw values at the screen's edges (left, right, top, bottom)
+  // and the screen size; a capacitive controller ignores both.
+  virtual void setRawRange(const int16_t raw[4]) { (void)raw; }
+  virtual void setScreenSize(int16_t w, int16_t h) { (void)w; (void)h; }
 
   // The controller's own resolution, in its native frame.
   int16_t nativeWidth() const { return _nativeW; }
