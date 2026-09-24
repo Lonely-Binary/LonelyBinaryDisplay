@@ -13,7 +13,7 @@ LB_Display::~LB_Display() {
   delete _touch;
   delete _tft;
   delete _bus;
-  free(_fb);
+  if (_fbOwned) free(_fb);
 }
 
 bool LB_Display::colorOrderIsBGR() const {
@@ -50,7 +50,11 @@ bool LB_Display::begin(bool useCanvas) {
 
   const int32_t spiHz = _spiHzOverride ? _spiHzOverride : _panel->spiHz;
 
-  if (par8()) {
+  if (rgb()) {
+    // No bus and no controller: the S3 scans the panel out of a framebuffer
+    // that the driver allocates in PSRAM.
+    _tft = new LB_RgbScreen(_panel);
+  } else if (par8()) {
     _bus = new LB_TFTPar8Bus(_wiringPar8.data, _wiringPar8.wr, _wiringPar8.dc);
     _tft = new LB_TFT(_bus, _panel, _wiringPar8.rst);
   } else {
@@ -72,7 +76,13 @@ bool LB_Display::begin(bool useCanvas) {
     return false;
   }
 
-  if (useCanvas) {
+  if (_tft->framebuffer()) {
+    // An RGB panel cannot exist without a framebuffer, so there is always a
+    // canvas, whatever was asked for - and it is the one being scanned out.
+    _fb = _tft->framebuffer();
+    _fbInPsram = true;
+    _fbOwned = false;
+  } else if (useCanvas) {
     // The panel is already at its rotation, so this is the shape the canvas
     // draws in. PSRAM first; the smaller panels also fit in internal RAM.
     const size_t bytes = (size_t)_tft->width() * _tft->height() * 2;
@@ -107,17 +117,28 @@ bool LB_Display::begin(bool useCanvas) {
 
 void LB_Display::touchBegin() {
   if (_panel->touch == LB_TOUCH_NONE) return;
-  // Touch pins live with the parallel wiring: the square series is the only
-  // one with touch so far. A touch SPI panel would add its pins to LB_Wiring.
-  const LB_TouchPins pins = {_wiringPar8.touchSda, _wiringPar8.touchScl,
-                             _wiringPar8.touchInt, _wiringPar8.touchRst};
+  // A board carries its own touch pins; the square series has them in its
+  // parallel wiring set.
+  LB_TouchPins pins = {};
+  if (rgb()) {
+    const LB_RgbBoard *b = _panel->rgb;
+    pins = {b->touchSda, b->touchScl, b->touchInt, b->touchRst,
+            b->touchSck, b->touchMiso, b->touchMosi, b->touchCs};
+  } else {
+    pins = {_wiringPar8.touchSda, _wiringPar8.touchScl, _wiringPar8.touchInt, _wiringPar8.touchRst,
+            -1, -1, -1, -1};
+  }
   _touch = LB_Touch::create(_panel->touch, pins);
   if (!_touch) {
-    Serial.println(F("[LB_Display] this panel has touch - #include <LB_TouchGT911.h> "
-                     "to use it. The display works without."));
+    static const char *kHeader[] = {"", "LB_TouchGT911.h", "LB_TouchXPT2046.h"};
+    Serial.printf("[LB_Display] this panel has touch - #include <%s> to use it. "
+                  "The display works without.\n", kHeader[_panel->touch]);
     return;
   }
   _touch->setOrientation(_panel->touchSwapXY, _panel->touchFlipX, _panel->touchFlipY);
+  _touch->setRawRange(_panel->touchRaw);
+  // A resistive panel has no resolution of its own: it reports in screen pixels.
+  _touch->setScreenSize(_panel->width, _panel->height);
   _touch->setRotation(_tft->rotation());
   if (!_touch->begin()) {
     Serial.println(F("[LB_Display] touch controller did not answer - check SDA/SCL. "
@@ -206,13 +227,15 @@ void LB_Display::backlight(uint8_t level) {
 
 void LB_Display::printInfo(Print &out) const {
   static const char *kDrivers[] = {"ST7735", "ST7789", "ST7796", "NV3007",
-                                   "ILI9341", "ILI9488"};
+                                   "ILI9341", "ILI9488", "RGB (no controller)"};
   out.println(F("---- Lonely Binary Display ----"));
   out.printf("Panel      : %s (%s)\n", _panel->name, _panel->id);
   out.printf("Driver IC  : %s\n", kDrivers[_panel->driver]);
   out.printf("Resolution : %dx%d  (native %dx%d, rotation %d)\n",
              width(), height(), _panel->width, _panel->height, _panel->rotation);
-  if (par8())
+  if (rgb())
+    out.printf("Bus        : 16-bit RGB, pixel clock %lu Hz\n", (unsigned long)_panel->rgb->pclkHz);
+  else if (par8())
     out.println(F("Bus        : 8-bit parallel"));
   else
     out.printf("SPI clock  : %ld Hz%s\n",
@@ -224,7 +247,11 @@ void LB_Display::printInfo(Print &out) const {
              blPin() < 0 ? "  (no pin — not driven)" : "");
   out.printf("Board      : %s%s\n", LB_WIRING_NAME,
              _customWiring ? "  (custom wiring)" : "");
-  if (par8()) {
+  if (rgb()) {
+    const LB_RgbBoard *b = _panel->rgb;
+    out.printf("Pins       : fixed by the board. DE=%d VSYNC=%d HSYNC=%d PCLK=%d BL=%d\n",
+               b->de, b->vsync, b->hsync, b->pclk, b->backlight);
+  } else if (par8()) {
     const LB_WiringPar8 &w = _wiringPar8;
     out.printf("Pins       : D0-D7=%d,%d,%d,%d,%d,%d,%d,%d WR=%d DC=%d RST=%d BL=%d\n",
                w.data[0], w.data[1], w.data[2], w.data[3], w.data[4], w.data[5],
@@ -235,19 +262,17 @@ void LB_Display::printInfo(Print &out) const {
                _wiring.mosi, _wiring.sclk, _wiring.backlight);
   }
   if (_panel->touch != LB_TOUCH_NONE) {
-    static const char *kTouch[] = {"none", "GT911"};
-    const LB_WiringPar8 &w = _wiringPar8;
-    out.printf("Touch      : %s %s  SDA=%d SCL=%d INT=%d RST=%d\n", kTouch[_panel->touch],
-               _touch ? "(running)" : "(not started)", w.touchSda, w.touchScl,
-               w.touchInt, w.touchRst);
+    static const char *kTouch[] = {"none", "GT911 (capacitive)", "XPT2046 (resistive)"};
+    out.printf("Touch      : %s %s\n", kTouch[_panel->touch], _touch ? "(running)" : "(not started)");
   }
   out.printf("Colour     : %s%s, %sinverted%s\n",
              colorOrderIsBGR() ? "BGR" : "RGB",
              _colorOrder == COLOR_AUTO ? "" : " (forced)",
              _inverted ? "" : "not ",
              _inverted == _panel->invert ? "" : " (forced)");
-  out.printf("Framebuffer: %s\n", !_fb ? "no (direct)"
-                                 : _fbInPsram ? "yes (PSRAM)" : "yes (internal RAM)");
+  out.printf("Framebuffer: %s%s\n", !_fb ? "no (direct)"
+                                   : _fbInPsram ? "yes (PSRAM)" : "yes (internal RAM)",
+             framebuffer2() ? ", double buffered" : "");
   // A customer whose screen misbehaves pastes this whole block into an AI
   // assistant. Carrying the URL means the assistant is handed the library's
   // real API along with the symptom, instead of guessing from TFT_eSPI.
