@@ -1,5 +1,5 @@
 /*
-  LonelyBinaryDisplay — one-line setup for every Lonely Binary SPI display.
+  LonelyBinaryDisplay — one-line setup for every Lonely Binary display.
 
   Every panel in the range plugs into the same 15-pin FPC breakout, so swapping
   a screen is a hardware no-op. This library makes it a software no-op:
@@ -31,6 +31,8 @@
 
 #include <Arduino.h>
 #include "LB_TFTPanel.h"
+#include "LB_TFTPar8Bus.h"
+#include "LB_Touch.h"
 #include "LB_Colors.h"
 #include "LB_Panels.h"
 #include "LB_Wiring.h"
@@ -85,6 +87,16 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   // Must be called before begin(); afterwards it does nothing.
   void setWiring(const LB_Wiring &wiring);
 
+  // The same for the square series, which is 8-bit parallel with I2C touch:
+  //
+  //     LB_WiringPar8 pins = LB_WIRING_PAR8;
+  //     pins.data[5] = 12;            // this board has D5 on GPIO12
+  //     pins.rst = -1;                // panel reset not wired
+  //     display.setWiring(pins);
+  //
+  // Which of the two applies is decided by the panel constant, not by you.
+  void setWiring(const LB_WiringPar8 &wiring);
+
   // Override the panel table's SPI clock. Useful when your own wiring has
   // longer traces or a ribbon extension and the default rate is marginal —
   // symptoms are a scrambled or half-drawn image. Must be called before
@@ -92,6 +104,7 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   void setSpiHz(int32_t hz) { _spiHzOverride = hz; }
 
   const LB_Wiring &wiring() const { return _wiring; }
+  const LB_WiringPar8 &wiringPar8() const { return _wiringPar8; }
 
   // ── Colour order and inversion ───────────────────────────────────────────
   //
@@ -170,6 +183,24 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   // which. On an on/off panel any non-zero level means on.
   void backlight(uint8_t level);
 
+  // ── Touch ──────────────────────────────────────────────────────────────
+  //
+  // For a panel with touch (the _ctp / _rtp constants), begin() also brings up
+  // the touch controller, and setRotation() keeps its coordinates in step with
+  // the picture. Include the driver header to enable it:
+  //
+  //     #include <LonelyBinaryDisplay.h>
+  //     #include <LB_TouchGT911.h>       // LB_SQUARE_392_CTP
+  //
+  // (The LVGL library includes it for you.) Without that include the display
+  // still works; touch() returns nullptr and begin() says why on Serial.
+  //
+  //     int16_t x, y;
+  //     if (display.touch() && display.touch()->getTouch(&x, &y)) { ... }
+  //
+  // nullptr for a panel without touch, or if the controller did not answer.
+  LB_Touch *touch() const { return _touch; }
+
   // Rotation 0-3. The panel's column/row offsets differ between portrait and
   // landscape, and the driver applies the right pair — which is exactly the
   // bug you get when the offsets are hard-coded in a sketch.
@@ -189,7 +220,9 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   LB_Wiring          _wiring = LB_WIRING;  // kit default until setWiring()
   bool               _customWiring = false;
   int32_t            _spiHzOverride = 0;
-  LB_TFTSpiBus      *_bus    = nullptr;
+  LB_WiringPar8      _wiringPar8 = LB_WIRING_PAR8;
+  LB_TFTBus         *_bus    = nullptr;
+  LB_Touch          *_touch  = nullptr;
   LB_TFT            *_tft    = nullptr;  // the panel itself
   uint16_t          *_fb     = nullptr;  // framebuffer, when requested
   bool               _fbInPsram = false;
@@ -201,6 +234,9 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   bool               _inverted;         // starts as the panel's, see ctor
 
   void backlightBegin();
+  void touchBegin();
+  bool par8() const { return _panel->bus == LB_BUS_PAR8; }
+  int8_t blPin() const { return par8() ? _wiringPar8.backlight : _wiring.backlight; }
 };
 
 #endif  // LONELY_BINARY_DISPLAY_H
