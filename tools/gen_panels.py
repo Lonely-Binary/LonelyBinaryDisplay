@@ -41,11 +41,11 @@ BANNER = "GENERATED FROM panels.yaml BY tools/gen_panels.py — DO NOT EDIT"
 LLMS_BEGIN = "<!-- BEGIN GENERATED PANEL TABLE — panels.yaml via tools/gen_panels.py -->"
 LLMS_END = "<!-- END GENERATED PANEL TABLE -->"
 
-DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341", "ILI9488"]  # append only: values are baked into sketches
+DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341", "ILI9488", "RGB"]  # append only: values are baked into sketches
 INIT_OPS = {None: "LB_INIT_NONE", "nv3007_279": "LB_INIT_NV3007_279"}
-BUSES = {"spi": "LB_BUS_SPI", "par8": "LB_BUS_PAR8"}
-TOUCH = ["NONE", "GT911"]  # append only, like DRIVERS
-TOUCH_KIND = {"GT911": "capacitive"}
+BUSES = {"spi": "LB_BUS_SPI", "par8": "LB_BUS_PAR8", "rgb": "LB_BUS_RGB"}
+TOUCH = ["NONE", "GT911", "XPT2046"]  # append only, like DRIVERS
+TOUCH_KIND = {"GT911": "capacitive", "XPT2046": "resistive"}
 
 
 def bus_of(panel) -> str:
@@ -112,7 +112,19 @@ def gen_header(doc) -> str:
         "enum LB_InitOps : uint8_t { LB_INIT_NONE, LB_INIT_NV3007_279 };",
         "",
         "// Which wiring set the panel uses: LB_WIRING (SPI) or LB_WIRING_PAR8.",
-        "enum LB_Bus : uint8_t { LB_BUS_SPI, LB_BUS_PAR8 };",
+        "enum LB_Bus : uint8_t { LB_BUS_SPI, LB_BUS_PAR8, LB_BUS_RGB };",
+        "",
+        "// A board whose display is 16-bit parallel RGB: timings and every pin,",
+        "// fixed by the PCB. Data pins in LCD_CAM order: B0-B4, G0-G5, R0-R4.",
+        "struct LB_RgbBoard {",
+        "  uint32_t pclkHz;",
+        "  uint16_t hsPulse, hsBack, hsFront, vsPulse, vsBack, vsFront;",
+        "  bool     pclkActiveNeg;",
+        "  int8_t   de, vsync, hsync, pclk, backlight;",
+        "  int8_t   data[16];",
+        "  int8_t   touchSda, touchScl, touchInt, touchRst;      // I2C touch",
+        "  int8_t   touchSck, touchMiso, touchMosi, touchCs;     // SPI touch",
+        "};",
         "",
         "enum LB_TouchCtl : uint8_t {",
     ] + [f"  LB_TOUCH_{t}," for t in TOUCH] + [
@@ -142,7 +154,27 @@ def gen_header(doc) -> str:
         "  bool             touchSwapXY; // touch axes relative to display rotation 0",
         "  bool             touchFlipX;",
         "  bool             touchFlipY;",
+        "  const LB_RgbBoard *rgb;       // LB_BUS_RGB only, else nullptr",
+        "  int16_t          touchRaw[4]; // resistive: raw x at left, right; y at top, bottom",
         "};",
+        "",
+    ]
+    for p in panels:
+        if bus_of(p) != "rgb":
+            continue
+        r, pins, t = p["rgb"], p["rgb"]["pins"], touch_of(p).get("pins", {})
+        data = pins["b"] + pins["g"] + pins["r"]
+        tp = lambda k: t.get(k, -1)
+        L.append(
+            f"static const LB_RgbBoard LB_RGB_{p['id'].upper()} = {{ {r['pclk_hz']}, "
+            f"{r['hsync']['pulse']}, {r['hsync']['back']}, {r['hsync']['front']}, "
+            f"{r['vsync']['pulse']}, {r['vsync']['back']}, {r['vsync']['front']}, "
+            f"{cbool(r.get('pclk_active_neg'))}, {pins['de']}, {pins['vsync']}, {pins['hsync']}, "
+            f"{pins['pclk']}, {pins['backlight']}, {{{', '.join(map(str, data))}}}, "
+            f"{tp('sda')}, {tp('scl')}, {tp('int')}, {tp('rst')}, "
+            f"{tp('sck')}, {tp('miso')}, {tp('mosi')}, {tp('cs')} }};"
+        )
+    L += [
         "",
         f"static const LB_PanelDef LB_PANELS[] = {{",
     ]
@@ -152,7 +184,7 @@ def gen_header(doc) -> str:
             "  {{ \"{id}\", \"{name}\", LB_DRV_{drv}, {w}, {h}, {rot}, "
             "{bgr}, {inv}, {fx}, {fy}, "
             "{o0}, {o1}, {o2}, {o3}, {hz}, "
-            "{bla}, {ops}, {bus}, LB_TOUCH_{tc}, {tsw}, {tfx}, {tfy} }},".format(
+            "{bla}, {ops}, {bus}, LB_TOUCH_{tc}, {tsw}, {tfx}, {tfy}, {rgb}, {{{raw}}} }},".format(
                 id=p["id"], name=p["name"], drv=p["driver"],
                 w=p["width"], h=p["height"], rot=p["rotation"],
                 bgr=cbool(p.get("bgr")),
@@ -167,6 +199,8 @@ def gen_header(doc) -> str:
                 tsw=cbool(touch_of(p).get("swap_xy")),
                 tfx=cbool(touch_of(p).get("flip_x")),
                 tfy=cbool(touch_of(p).get("flip_y")),
+                rgb=f"&LB_RGB_{p['id'].upper()}" if bus_of(p) == "rgb" else "nullptr",
+                raw=", ".join(map(str, touch_of(p).get("raw", [0, 0, 0, 0]))),
             )
         )
     L += ["};", "", f"#define LB_PANEL_COUNT {len(panels)}", ""]
@@ -344,7 +378,8 @@ def gen_llms_panels(doc) -> str:
     def row(p, label):
         cls = mp_cls(p)
         mp = f"`{mp_name(p)}`" if cls in have and bus_of(p) == "spi" else "not supported"
-        bus = f"SPI {mhz(p['spi_hz'])}" if bus_of(p) == "spi" else "8-bit parallel"
+        bus = {"spi": f"SPI {mhz(p.get('spi_hz', 0))}", "par8": "8-bit parallel",
+               "rgb": "16-bit RGB (S3 only)"}[bus_of(p)]
         t = touch_of(p).get("controller")
         touch = f"{t} ({TOUCH_KIND[t]})" if t else "—"
         return (

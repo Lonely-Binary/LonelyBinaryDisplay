@@ -336,6 +336,96 @@ panels:
       offsets, all four rotations and touch in all four rotations measured on
       the classic-ESP32 bench rig (bench wiring, not the proposed breakout).
 
+  # ── Third-party boards ─────────────────────────────────────────────────────
+  #
+  # A display and an ESP32-S3 on one PCB, sold by someone else. Named by the
+  # board's own model number, because that is what is printed on it. The pins
+  # are fixed by that PCB, so they live here with the panel rather than in a
+  # wiring set.
+  #
+  # bus: rgb - 16-bit parallel RGB (RGB565 on the wires), scanned out
+  # continuously by the S3's LCD_CAM from a framebuffer in PSRAM. There is no
+  # controller to talk to: the panel is just timings and pins. S3 only.
+
+  - id: sunton_4827s043r
+    product: false
+    const: LB_SUNTON_4827S043R
+    name: 'Sunton ESP32-4827S043R'
+    family: board
+    driver: RGB
+    bus: rgb
+    width: 480
+    height: 272
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    backlight_active_low: false
+    rgb:
+      pclk_hz: 8000000
+      hsync: {pulse: 4, back: 43, front: 8}
+      vsync: {pulse: 4, back: 12, front: 8}
+      pclk_active_neg: true
+      pins:
+        de: 40
+        vsync: 41
+        hsync: 39
+        pclk: 42
+        backlight: 2
+        r: [45, 48, 47, 21, 14]      # R0..R4 - Sunton's own demo; rzeldent's
+        g: [5, 6, 7, 15, 16, 4]      # board files swap R and B
+        b: [8, 3, 46, 9, 1]
+    touch:
+      controller: XPT2046
+      pins: {sck: 12, miso: 13, mosi: 11, cs: 38, int: 18}
+      raw: [188, 3951, 254, 3791]    # measured 2026-09-24: raw x at left/right edge, y at top/bottom
+    notes: >-
+      4.3", 480x272, resistive touch. Pins from Sunton's demo (Arduino_GFX
+      discussion #587) and rzeldent/platformio-espressif32-sunton, which agree
+      except that the latter swaps the R and B names. Timings are rzeldent's.
+      Touch shares SPI with the TF card (CS 10).
+
+  - id: sunton_8048s070c
+    product: false
+    const: LB_SUNTON_8048S070C
+    name: 'Sunton ESP32-8048S070C'
+    family: board
+    driver: RGB
+    bus: rgb
+    width: 800
+    height: 480
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    backlight_active_low: false
+    rgb:
+      pclk_hz: 12500000
+      hsync: {pulse: 30, back: 16, front: 210}
+      vsync: {pulse: 13, back: 10, front: 22}
+      pclk_active_neg: true
+      pins:
+        de: 41
+        vsync: 40
+        hsync: 39
+        pclk: 42
+        backlight: 2
+        r: [14, 21, 47, 48, 45]      # R0..R4 - Sunton's demo (R/B confirmed on the 4827S043R)
+        g: [9, 46, 3, 8, 16, 1]
+        b: [15, 7, 6, 5, 4]
+    touch:
+      controller: GT911
+      # INT deliberately not used: GPIO18 is also the MAX98357's I2S LRCLK and
+      # is on header P4. Driving it low for the GT911 address strap would poke
+      # the amplifier. The driver polls and tries both addresses without it.
+      pins: {sda: 19, scl: 20, int: -1, rst: 38}
+    notes: >-
+      7", 800x480, capacitive touch. Pins from Sunton's demo; timings from
+      rzeldent/platformio-espressif32-sunton. Also on the board: MAX98357 I2S
+      amplifier (DIN 17, LRCLK 18), microSD on SPI (CS 10, MOSI 11, SCK 12,
+      MISO 13), headers P1 (UART0 43/44) and P4 (17, 18).
+      The 750 KB framebuffer is scanned out of PSRAM at 25 MB/s.
+
   # ── Panels we do NOT sell ──────────────────────────────────────────────────
   #
   # Driveable, but not products. Keyed by controller + resolution so nobody

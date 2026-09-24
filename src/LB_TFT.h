@@ -84,7 +84,41 @@ private:
   struct spi_struct_t *_bus = nullptr; /* the HAL handle behind _spi */
 };
 
-class LB_TFT
+/* What LB_Display and LB_TFTPanel need from a panel driver. Two kinds sit
+ * behind it: LB_TFT, a controller with its own RAM that is sent commands over
+ * SPI or 8080, and LB_RgbScreen, a controller-less RGB panel scanned out from a
+ * framebuffer the S3 owns. */
+class LB_Screen
+{
+public:
+  virtual ~LB_Screen() {}
+  virtual bool begin(int32_t hz, bool bgr, bool invert) = 0;
+  virtual void setRotation(uint8_t r) = 0;
+  virtual void setColorOrder(bool bgr) = 0;
+  virtual void setInverted(bool invert) = 0;
+  virtual int16_t width() const = 0;
+  virtual int16_t height() const = 0;
+  virtual uint8_t rotation() const = 0;
+  virtual void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) = 0;
+  virtual void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t *px) = 0;
+
+  /* The driver's own framebuffer, for a panel that cannot exist without one
+   * (RGB). nullptr for a controller with its own RAM. */
+  virtual uint16_t *framebuffer() const { return nullptr; }
+  /* Show what has been drawn into `fb`. A controller is sent the whole frame;
+   * an RGB panel, whose scan-out already reads `fb`, only needs the CPU cache
+   * written back to PSRAM. */
+  virtual void flushFramebuffer(const uint16_t *fb) { pushImage(0, 0, width(), height(), fb); }
+
+  /* Double buffering, for a panel scanned out of memory (RGB). The second
+   * buffer, or nullptr; and present(), which makes `fb` the one on screen at
+   * the next vertical blank and returns once it is - so the other buffer is
+   * no longer being scanned and can be drawn into without tearing. */
+  virtual uint16_t *framebuffer2() const { return nullptr; }
+  virtual void present(const uint16_t *fb) { flushFramebuffer(fb); }
+};
+
+class LB_TFT : public LB_Screen
 {
 public:
   LB_TFT(LB_TFTBus *bus, const LB_PanelDef *panel, int8_t rst)
@@ -92,20 +126,20 @@ public:
 
   /* Reset, init table, inversion, MADCTL, full-screen window - the order
    * Arduino_TFT::begin() used. */
-  bool begin(int32_t hz, bool bgr, bool invert);
+  bool begin(int32_t hz, bool bgr, bool invert) override;
 
-  void setRotation(uint8_t r);   /* 0-3 */
-  void setColorOrder(bool bgr);  /* rewrites MADCTL; works at any time */
-  void setInverted(bool invert);
+  void setRotation(uint8_t r) override;   /* 0-3 */
+  void setColorOrder(bool bgr) override;  /* rewrites MADCTL; works at any time */
+  void setInverted(bool invert) override;
 
-  int16_t width() const { return _w; }
-  int16_t height() const { return _h; }
-  uint8_t rotation() const { return _rotation; }
+  int16_t width() const override { return _w; }
+  int16_t height() const override { return _h; }
+  uint8_t rotation() const override { return _rotation; }
 
   /* Both clip to the screen, so callers can be sloppy. */
-  void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+  void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) override;
   /* `px` is a w x h block, row-major, RGB565 as the CPU holds it. */
-  void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t *px);
+  void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t *px) override;
 
 private:
   LB_TFTBus *_bus;
