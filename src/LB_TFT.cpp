@@ -40,6 +40,8 @@ static const uint8_t *initTable(const LB_PanelDef *p) {
       // voltage/gamma table — without it the panel comes up looking wrong.
       return p->initOps == LB_INIT_NV3007_279 ? LB_INITSEQ_NV3007_279
                                               : LB_INITSEQ_NV3007_168;
+    case LB_DRV_RGB:
+      break;  // no controller, so no init table: LB_RgbScreen drives these
   }
   return nullptr;
 }

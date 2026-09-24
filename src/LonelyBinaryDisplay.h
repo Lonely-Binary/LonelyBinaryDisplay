@@ -32,6 +32,7 @@
 #include <Arduino.h>
 #include "LB_TFTPanel.h"
 #include "LB_TFTPar8Bus.h"
+#include "LB_RgbScreen.h"
 #include "LB_Touch.h"
 #include "LB_Colors.h"
 #include "LB_Panels.h"
@@ -177,6 +178,13 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   // makes the flush callback a no-op — see the Lonely Binary LVGL library.
   uint16_t *framebuffer() const { return _fb; }
 
+  // Double buffering, on a panel scanned out of memory (the RGB boards): the
+  // second buffer, or nullptr; and present(buf), which puts `buf` on screen at
+  // the next vertical blank and returns once it is. The LVGL library uses these
+  // to draw without tearing. Plain drawing ignores them and uses framebuffer().
+  uint16_t *framebuffer2() const { return _tft ? _tft->framebuffer2() : nullptr; }
+  void present(const uint16_t *buf) { if (_tft) _tft->present(buf); }
+
 
   // Backlight, 0 = off, 255 = full. Panels wired active-low and panels with
   // PWM dimming are handled here; the caller never needs to know which is
@@ -223,9 +231,10 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   LB_WiringPar8      _wiringPar8 = LB_WIRING_PAR8;
   LB_TFTBus         *_bus    = nullptr;
   LB_Touch          *_touch  = nullptr;
-  LB_TFT            *_tft    = nullptr;  // the panel itself
+  LB_Screen         *_tft    = nullptr;  // the panel itself: LB_TFT or LB_RgbScreen
   uint16_t          *_fb     = nullptr;  // framebuffer, when requested
   bool               _fbInPsram = false;
+  bool               _fbOwned = true;    // false: the RGB driver's, not ours to free
   bool               _blReady = false;
   ColorOrder         _colorOrder = COLOR_AUTO;
   bool               _blActiveLow = false;   // set from the panel in begin()
@@ -236,7 +245,10 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   void backlightBegin();
   void touchBegin();
   bool par8() const { return _panel->bus == LB_BUS_PAR8; }
-  int8_t blPin() const { return par8() ? _wiringPar8.backlight : _wiring.backlight; }
+  bool rgb() const { return _panel->bus == LB_BUS_RGB; }
+  int8_t blPin() const {
+    return rgb() ? _panel->rgb->backlight : par8() ? _wiringPar8.backlight : _wiring.backlight;
+  }
 };
 
 #endif  // LONELY_BINARY_DISPLAY_H
