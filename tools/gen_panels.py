@@ -41,7 +41,7 @@ BANNER = "GENERATED FROM panels.yaml BY tools/gen_panels.py — DO NOT EDIT"
 LLMS_BEGIN = "<!-- BEGIN GENERATED PANEL TABLE — panels.yaml via tools/gen_panels.py -->"
 LLMS_END = "<!-- END GENERATED PANEL TABLE -->"
 
-DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341", "ILI9488", "RGB"]  # append only: values are baked into sketches
+DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341", "ILI9488", "RGB", "ILI9327", "ILI9486"]  # append only: values are baked into sketches
 INIT_OPS = {None: "LB_INIT_NONE", "nv3007_279": "LB_INIT_NV3007_279"}
 BUSES = {"spi": "LB_BUS_SPI", "par8": "LB_BUS_PAR8", "rgb": "LB_BUS_RGB"}
 TOUCH = ["NONE", "GT911", "XPT2046"]  # append only, like DRIVERS
@@ -126,6 +126,18 @@ def gen_header(doc) -> str:
         "  int8_t   touchSck, touchMiso, touchMosi, touchCs;     // SPI touch",
         "};",
         "",
+        "// A loose 8-bit parallel module: its own pins, -1 = tied off on the module.",
+        "struct LB_Par8Board {",
+        "  int8_t data[8];   // D0..D7",
+        "  int8_t wr, dc, rd, cs, rst, backlight;",
+        "};",
+        "",
+        "// A loose SPI module: its own pins. The SPI host is not here, it follows the MCU.",
+        "struct LB_SpiBoard {",
+        "  int8_t cs, rst, dc, mosi, miso, sclk, backlight;",
+        "  int8_t touchCs, touchIrq;   // resistive touch sharing the bus; -1 = none",
+        "};",
+        "",
         "enum LB_TouchCtl : uint8_t {",
     ] + [f"  LB_TOUCH_{t}," for t in TOUCH] + [
         "};",
@@ -156,6 +168,8 @@ def gen_header(doc) -> str:
         "  bool             touchFlipY;",
         "  const LB_RgbBoard *rgb;       // LB_BUS_RGB only, else nullptr",
         "  int16_t          touchRaw[4]; // resistive: raw x at left, right; y at top, bottom",
+        "  const LB_Par8Board *par8;     // LB_BUS_PAR8 with its own pins, else nullptr",
+        "  const LB_SpiBoard  *spi;      // LB_BUS_SPI with its own pins, else nullptr",
         "};",
         "",
     ]
@@ -174,6 +188,24 @@ def gen_header(doc) -> str:
             f"{tp('sda')}, {tp('scl')}, {tp('int')}, {tp('rst')}, "
             f"{tp('sck')}, {tp('miso')}, {tp('mosi')}, {tp('cs')} }};"
         )
+    for p in panels:
+        if "spi" not in p:
+            continue
+        b = p["spi"]
+        L.append(
+            f"static const LB_SpiBoard LB_SPI_{p['id'].upper()} = {{ {b['cs']}, {b['rst']}, "
+            f"{b['dc']}, {b['mosi']}, {b['miso']}, {b['sclk']}, {b['backlight']}, "
+            f"{b.get('touch_cs', -1)}, {b.get('touch_irq', -1)} }};"
+        )
+    for p in panels:
+        if "par8" not in p:
+            continue
+        b = p["par8"]
+        L.append(
+            f"static const LB_Par8Board LB_PAR8_{p['id'].upper()} = {{ "
+            f"{{{', '.join(map(str, b['data']))}}}, {b['wr']}, {b['dc']}, "
+            f"{b.get('rd', -1)}, {b.get('cs', -1)}, {b['rst']}, {b['backlight']} }};"
+        )
     L += [
         "",
         f"static const LB_PanelDef LB_PANELS[] = {{",
@@ -184,7 +216,7 @@ def gen_header(doc) -> str:
             "  {{ \"{id}\", \"{name}\", LB_DRV_{drv}, {w}, {h}, {rot}, "
             "{bgr}, {inv}, {fx}, {fy}, "
             "{o0}, {o1}, {o2}, {o3}, {hz}, "
-            "{bla}, {ops}, {bus}, LB_TOUCH_{tc}, {tsw}, {tfx}, {tfy}, {rgb}, {{{raw}}} }},".format(
+            "{bla}, {ops}, {bus}, LB_TOUCH_{tc}, {tsw}, {tfx}, {tfy}, {rgb}, {{{raw}}}, {par8}, {spi} }},".format(
                 id=p["id"], name=p["name"], drv=p["driver"],
                 w=p["width"], h=p["height"], rot=p["rotation"],
                 bgr=cbool(p.get("bgr")),
@@ -201,6 +233,8 @@ def gen_header(doc) -> str:
                 tfy=cbool(touch_of(p).get("flip_y")),
                 rgb=f"&LB_RGB_{p['id'].upper()}" if bus_of(p) == "rgb" else "nullptr",
                 raw=", ".join(map(str, touch_of(p).get("raw", [0, 0, 0, 0]))),
+                par8=f"&LB_PAR8_{p['id'].upper()}" if "par8" in p else "nullptr",
+                spi=f"&LB_SPI_{p['id'].upper()}" if "spi" in p else "nullptr",
             )
         )
     L += ["};", "", f"#define LB_PANEL_COUNT {len(panels)}", ""]
@@ -277,7 +311,8 @@ def par8_wiring(doc):
     def init(d):
         return ("{ {" + ", ".join(str(x) for x in d["data"]) + "}, "
                 f"{d['wr']}, {d['dc']}, {d['rst']}, {d['backlight']}, "
-                f"{d['touch_sda']}, {d['touch_scl']}, {d['touch_int']}, {d['touch_rst']} }}")
+                f"{d['touch_sda']}, {d['touch_scl']}, {d['touch_int']}, {d['touch_rst']}, "
+                f"{d.get('cs', -1)}, {d.get('rd', -1)} }}")
 
     return [
         "// The square series is 8-bit parallel with I2C touch, on a breakout of its",
@@ -287,6 +322,7 @@ def par8_wiring(doc):
         "  int8_t data[8];   // D0..D7",
         "  int8_t wr, dc, rst, backlight;",
         "  int8_t touchSda, touchScl, touchInt, touchRst;",
+        "  int8_t cs, rd;    // -1 = tied off on the board",
         "};",
         "",
         "#if defined(CONFIG_IDF_TARGET_ESP32S3)",
@@ -320,7 +356,7 @@ def gen_python(doc) -> str:
 
     # Parallel panels have no MicroPython driver yet, so they are left out
     # rather than listed and then failing inside lb_display.
-    panels = [p for p in panels if bus_of(p) == "spi"]
+    panels = [p for p in panels if bus_of(p) == "spi" and "spi" not in p]
     names = []
     for p in panels:
         off = p["offsets"]

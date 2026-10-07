@@ -1,5 +1,6 @@
 #include "LB_TFT.h"
 #include "LB_TFTInit.h"
+#include "LB_TFTInitExtra.h"
 
 #include <SPI.h>
 #include <driver/gpio.h>
@@ -23,6 +24,9 @@ static const LB_Ctl kCtl[] = {
   /* NV3007  */ { 120, false, true  },
   /* ILI9341 */ { 150, false, false },
   /* ILI9488 */ { 150, false, false },
+  /* RGB     */ { 0,   false, true  },  // never reached: no controller to reset
+  /* ILI9327 */ { 150, true,  false },  // MCUFRIEND_kbv: SWRESET + 150 ms
+  /* ILI9486 */ { 120, false, false },
 };
 
 static const uint8_t *initTable(const LB_PanelDef *p) {
@@ -40,6 +44,8 @@ static const uint8_t *initTable(const LB_PanelDef *p) {
       // voltage/gamma table — without it the panel comes up looking wrong.
       return p->initOps == LB_INIT_NV3007_279 ? LB_INITSEQ_NV3007_279
                                               : LB_INITSEQ_NV3007_168;
+    case LB_DRV_ILI9327: return LB_INITSEQ_ILI9327;
+    case LB_DRV_ILI9486: return LB_INITSEQ_ILI9486;
     case LB_DRV_RGB:
       break;  // no controller, so no init table: LB_RgbScreen drives these
   }
@@ -60,7 +66,18 @@ static uint8_t lb_madctl(LB_Driver drv, uint8_t r, bool bgr) {
       case 3:  bits = MX | MV; break;
       default: bits = MX | MY; break;
     }
-  } else if (drv == LB_DRV_ILI9341 || drv == LB_DRV_ILI9488) {
+  } else if (drv == LB_DRV_ILI9327) {
+    // MCUFRIEND_kbv's values. The 180 and 270 degree ones also set ML (0x10,
+    // vertical refresh order) alongside MY.
+    const uint8_t ML = 0x10;
+    switch (r & 3) {
+      case 1:  bits = MV;                 break;
+      case 2:  bits = MY | ML;            break;
+      case 3:  bits = MY | MX | MV | ML;  break;
+      default: bits = MX;                 break;
+    }
+  } else if (drv == LB_DRV_ILI9341 || drv == LB_DRV_ILI9488 ||
+             drv == LB_DRV_ILI9486) {
     // A third mapping again — ILI9341 agrees with neither family above.
     // ILI9488 uses the same one.
     switch (r & 3) {
@@ -238,7 +255,7 @@ bool LB_TFTSpiBus::begin(int32_t hz) {
   _spi = new SPIClass(_host);
   if (!_spi) return false;
   // No MISO, and CS is ours: the panel is write-only here.
-  _spi->begin(_sclk, -1, _mosi, -1);
+  _spi->begin(_sclk, _miso, _mosi, -1);
   _bus = _spi->bus();
   if (!_bus) return false;
   _div = spiFrequencyToClockDiv(_bus, hz);
@@ -275,7 +292,25 @@ void LB_TFTSpiBus::data32(uint32_t v) {
   spiWriteLongNL(_bus, v);
 }
 
+// RGB565 -> RGB666, one colour byte per channel with the unused low bits zero.
+static inline void lb_px18(uint16_t c, uint8_t *o) {
+  o[0] = (c >> 8) & 0xF8;
+  o[1] = (c >> 3) & 0xFC;
+  o[2] = (c << 3) & 0xF8;
+}
+
 void LB_TFTSpiBus::repeat(uint16_t color, uint32_t n) {
+  if (_px18) {
+    uint8_t buf[192];  // 64 pixels
+    const uint32_t fill = n < 64 ? n : 64;
+    for (uint32_t i = 0; i < fill; i++) lb_px18(color, buf + 3 * i);
+    while (n) {
+      const uint32_t k = n < 64 ? n : 64;
+      spiWriteNL(_bus, buf, k * 3);
+      n -= k;
+    }
+    return;
+  }
   // Text is mostly runs of one to a few pixels; skip the buffer for those.
   if (n <= 2) {
     if (n == 2) spiWriteLongNL(_bus, ((uint32_t)color << 16) | color);
@@ -301,6 +336,17 @@ void LB_TFTSpiBus::repeat(uint16_t color, uint32_t n) {
 // The HAL's 16-bit write sends each pixel high byte first, which is the
 // order every one of these controllers expects.
 void LB_TFTSpiBus::pixels(const uint16_t *px, uint32_t n) {
+  if (_px18) {
+    uint8_t buf[192];
+    while (n) {
+      const uint32_t k = n < 64 ? n : 64;
+      for (uint32_t i = 0; i < k; i++) lb_px18(px[i], buf + 3 * i);
+      spiWriteNL(_bus, buf, k * 3);
+      px += k;
+      n -= k;
+    }
+    return;
+  }
   spiWritePixelsNL(_bus, px, n * 2);
 }
 
