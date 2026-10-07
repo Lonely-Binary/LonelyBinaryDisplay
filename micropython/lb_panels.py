@@ -213,6 +213,23 @@ ILI9341_240X320 = {
     "bl_active_low": False,
 }
 
+ILI9341_320X240 = {
+    "id": "ili9341_320x240",
+    "name": "ILI9341 320x240",
+    "cls": "ILI9341",
+    "width": 240,
+    "height": 320,
+    "rotation": 1,
+    "xstart": 0,
+    "ystart": 0,
+    "bgr": True,
+    "invert": False,
+    "flip_x": False,
+    "flip_y": False,
+    "baudrate": 40000000,
+    "bl_active_low": False,
+}
+
 # Panels Lonely Binary sells.
 PRODUCTS = {
     "tft_096": TFT_096,
@@ -242,4 +259,5 @@ PANELS = {
     "narrow_225": NARROW_225,
     "narrow_279": NARROW_279,
     "ili9341_240x320": ILI9341_240X320,
+    "ili9341_320x240": ILI9341_320X240,
 }

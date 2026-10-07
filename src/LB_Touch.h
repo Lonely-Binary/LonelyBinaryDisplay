@@ -31,6 +31,7 @@
 struct LB_TouchPins {
   int8_t sda, scl, intr, rst;     // I2C controllers. -1 = not wired
   int8_t sck, miso, mosi, cs;     // SPI controllers
+  void  *spi = nullptr;           // SPIClass of a bus the display already runs; null = open our own
 };
 
 struct LB_TouchPoint {

@@ -458,3 +458,96 @@ panels:
       STILL UNVERIFIED: only rotation 0 has been checked. 1, 2 and 3 are
       untried, and ILI9341 is the one controller here with its own MADCTL
       rotation mapping, so those are the interesting ones.
+
+  # ── ILI9327 400x240, 8-bit parallel, no touch ─────────────────────────────
+  #
+  # par8: the pins, when the module is NOT on the square-series breakout. Unlike
+  # wiring_par8 these belong to the panel entry, because a loose 8080 module has
+  # no breakout to inherit from. cs / rd are real pins here (-1 = tied off).
+  # A sketch can still override all of it with setWiring().
+  - id: ili9327_400x240
+    product: false
+    const: LB_ILI9327_400X240
+    name: 'ILI9327 400x240'
+    family: generic
+    driver: ILI9327
+    bus: par8
+    width: 240          # controller RAM is 240 x 432; the glass shows 400 rows
+    height: 400
+    rotation: 1         # ships landscape, 400 x 240; verified 2026-10-07 (upright, full screen)
+    # MCUFRIEND_kbv's OFFSET_9327: the glass is the first 400 of 432 RAM rows,
+    # so the two rotations that flip the row scan start 32 rows in.
+    offsets: [0, 0, 0, 32]
+    bgr: true           # verified 2026-10-07 by eye
+    invert: false       # verified 2026-10-07 by eye
+    backlight_active_low: false   # verified 2026-10-07
+    par8:
+      data: [14, 12, 13, 15, 2, 4, 16, 17]   # D0..D7
+      wr: 33
+      dc: 27
+      rd: 5
+      cs: 26
+      rst: 18
+      backlight: 32
+    notes: >-
+      Third-party 400x240 module on a classic ESP32. Init table is MCUFRIEND_kbv's
+      (there is no Arduino_GFX driver to capture from), see LB_TFTInitExtra.h.
+      GPIO 12 (D1) and 15 (D3) are boot-strapping pins and 2 (D4) / 5 (RD) are
+      too: if the board will not boot with the module plugged in, unplug it.
+
+  # ── ILI9486 320x480, SPI, resistive touch on the same SPI bus ───────────────
+  #
+  # spi: this module's own pins, for the same reason as par8 above. Touch
+  # shares MOSI/MISO/SCLK with the display and has its own CS and IRQ.
+  # The host (VSPI/HSPI) is not here: it follows the MCU, from LB_WIRING.
+  - id: ili9486_480x320
+    product: false
+    const: LB_ILI9486_480X320
+    name: 'ILI9486 480x320'
+    family: generic
+    driver: ILI9486
+    width: 320
+    height: 480
+    rotation: 3         # verified 2026-10-07: 480x320 landscape, upright, full screen
+    offsets: [0, 0, 0, 0]
+    bgr: true           # verified 2026-10-07 by eye: red/green/blue blocks correct
+    invert: false       # verified 2026-10-07
+    spi_hz: 20000000    # UNVERIFIED - conservative; the chip takes 18-bit colour over SPI
+    backlight_active_low: false
+    spi:
+      cs: 16
+      rst: -1           # software reset
+      dc: 0
+      mosi: 23
+      miso: 19
+      sclk: 18
+      backlight: 2
+      touch_cs: 15
+      touch_irq: 4
+    # No touch: the XPT2046 on this module (CS 15, IRQ 4, shared bus) never
+    # answered - MISO read all ones even bit-banged, so it is wiring, not code.
+    # touch_cs / touch_irq above stay so the pins are recorded.
+    notes: >-
+      Third-party 3.5" module on a classic ESP32. Native 320x480; it ships landscape (rotation 3). ILI9486 over SPI takes 18-bit
+      colour only, so the bus expands RGB565 to three bytes a pixel (COLMOD
+      0x66). Init is Arduino_ILI9486_18bit's. GPIO 0 (DC), 2 (BL) and 15
+      (touch CS) are boot-strapping pins.
+
+  # Same panel as ili9341_240x320, shipped landscape. The constant a sketch
+  # picks for a screen that is mounted sideways; everything else is identical.
+  - id: ili9341_320x240
+    product: false
+    const: LB_ILI9341_320X240
+    name: 'ILI9341 320x240'
+    family: generic
+    driver: ILI9341
+    width: 240
+    height: 320
+    rotation: 1         # verified 2026-10-07: upright, colours and edges correct
+    offsets: [0, 0, 0, 0]
+    bgr: true
+    invert: false
+    spi_hz: 40000000
+    backlight_active_low: false
+    notes: ili9341_240x320 turned 90 degrees; native size and every other value are the same.
+
