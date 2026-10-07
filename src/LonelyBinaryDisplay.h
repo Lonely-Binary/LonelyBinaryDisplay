@@ -59,7 +59,25 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
    */
   explicit LB_Display(const LB_PanelDef *panel)
       : LB_TFTPanel(), LB_Canvas(*static_cast<LB_TFTPanel *>(this)), _panel(panel),
-        _inverted(panel->invert) {}
+        _inverted(panel->invert) {
+    // A loose parallel module carries its own pins; the square series uses
+    // LB_WIRING_PAR8. setWiring() still overrides either.
+    if (panel->spi) {
+      const LB_SpiBoard &b = *panel->spi;
+      _wiring.cs = b.cs; _wiring.rst = b.rst; _wiring.dc = b.dc;
+      _wiring.mosi = b.mosi; _wiring.miso = b.miso; _wiring.sclk = b.sclk;
+      _wiring.backlight = b.backlight;   // spiHost stays the MCU's
+    }
+    if (panel->par8) {
+      const LB_Par8Board &b = *panel->par8;
+      for (int i = 0; i < 8; i++) _wiringPar8.data[i] = b.data[i];
+      _wiringPar8.wr = b.wr; _wiringPar8.dc = b.dc; _wiringPar8.rst = b.rst;
+      _wiringPar8.backlight = b.backlight;
+      _wiringPar8.cs = b.cs; _wiringPar8.rd = b.rd;
+      _wiringPar8.touchSda = _wiringPar8.touchScl = -1;
+      _wiringPar8.touchInt = _wiringPar8.touchRst = -1;
+    }
+  }
 
   using LB_Canvas::flush;
   using LB_Canvas::sleep;

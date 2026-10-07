@@ -122,6 +122,9 @@ transpose of the raw glass:
 - `LB_NARROW_19` — glass is 170 x 320, ships at rotation 1, so you get 320 x 170
 - `LB_NARROW_225` — glass is 76 x 284, ships at rotation 1, so you get 284 x 76
 - `LB_NARROW_279` — glass is 142 x 428, ships at rotation 1, so you get 428 x 142
+- `LB_ILI9327_400X240` — glass is 240 x 400, ships at rotation 1, so you get 400 x 240
+- `LB_ILI9486_480X320` — glass is 320 x 480, ships at rotation 3, so you get 480 x 320
+- `LB_ILI9341_320X240` — glass is 240 x 320, ships at rotation 1, so you get 320 x 240
 
 ### Panels the library can drive but Lonely Binary does not sell
 
@@ -137,6 +140,9 @@ controller may well need `setColorOrder()` / `setInverted()` /
 | RGB | `LB_SUNTON_4827S043R` | not supported | 480 x 272 | RGB | 16-bit RGB (S3 only) | XPT2046 (resistive) | active high |
 | RGB | `LB_SUNTON_8048S070C` | not supported | 800 x 480 | RGB | 16-bit RGB (S3 only) | GT911 (capacitive) | active high |
 | ILI9341 | `LB_ILI9341_240X320` | not supported | 240 x 320 | ILI9341 | SPI 40 MHz | — | active high |
+| ILI9327 | `LB_ILI9327_400X240` | not supported | 400 x 240 | ILI9327 | 8-bit parallel | — | active high |
+| ILI9486 | `LB_ILI9486_480X320` | not supported | 480 x 320 | ILI9486 | SPI 20 MHz | — | active high |
+| ILI9341 | `LB_ILI9341_320X240` | not supported | 320 x 240 | ILI9341 | SPI 40 MHz | — | active high |
 
 <!-- END GENERATED PANEL TABLE -->
 

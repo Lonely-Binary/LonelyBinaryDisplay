@@ -62,8 +62,8 @@ public:
 class LB_TFTSpiBus : public LB_TFTBus
 {
 public:
-  LB_TFTSpiBus(int8_t dc, int8_t cs, int8_t sclk, int8_t mosi, uint8_t host)
-      : _dc(dc), _cs(cs), _sclk(sclk), _mosi(mosi), _host(host) {}
+  LB_TFTSpiBus(int8_t dc, int8_t cs, int8_t sclk, int8_t mosi, uint8_t host, int8_t miso = -1)
+      : _dc(dc), _cs(cs), _sclk(sclk), _mosi(mosi), _miso(miso), _host(host) {}
   ~LB_TFTSpiBus();
 
   bool begin(int32_t hz) override;
@@ -76,9 +76,17 @@ public:
   void pixels(const uint16_t *px, uint32_t n) override;
   void hardwareReset(int8_t rst, uint16_t ms) override;
 
+  /* Controllers that only take 18-bit colour over SPI (ILI9486, ILI9488): every
+   * RGB565 pixel goes out as three bytes. */
+  void setPixel18(bool on) { _px18 = on; }
+  /* The bus itself, so a touch controller on the same pins shares it instead of
+   * claiming the pins a second time (which would unplug the display). */
+  class SPIClass *spi() const { return _spi; }
+
 private:
-  int8_t _dc, _cs, _sclk, _mosi;
+  int8_t _dc, _cs, _sclk, _mosi, _miso;
   uint8_t _host;
+  bool _px18 = false;
   uint32_t _div = 0;                  /* clock divider, computed once */
   class SPIClass *_spi = nullptr;
   struct spi_struct_t *_bus = nullptr; /* the HAL handle behind _spi */
