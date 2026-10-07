@@ -30,10 +30,11 @@ struct LB_WiringPar8 {
   int8_t data[8];   // D0..D7
   int8_t wr, dc, rst, backlight;
   int8_t touchSda, touchScl, touchInt, touchRst;
+  int8_t cs, rd;    // -1 = tied off on the board
 };
 
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
-  static const LB_WiringPar8 LB_WIRING_PAR8 = { {4, 5, 6, 7, 15, 16, 17, 18}, 8, 9, 42, 41, 1, 2, 40, 39 };
+  static const LB_WiringPar8 LB_WIRING_PAR8 = { {4, 5, 6, 7, 15, 16, 17, 18}, 8, 9, 42, 41, 1, 2, 40, 39, -1, -1 };
 #else
-  static const LB_WiringPar8 LB_WIRING_PAR8 = { {5, 17, 16, 15, 13, 26, 14, 27}, 4, 23, 33, 32, 21, 22, 18, 19 };
+  static const LB_WiringPar8 LB_WIRING_PAR8 = { {5, 17, 16, 15, 13, 26, 14, 27}, 4, 23, 33, 32, 21, 22, 18, 19, -1, -1 };
 #endif

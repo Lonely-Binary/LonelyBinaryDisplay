@@ -40,6 +40,22 @@ Arduino/C++ **and** MicroPython, from one shared panel table.
 | `LB_NARROW_225` | 2.25" | 76 × 284 | ST7789 | active low |
 | `LB_NARROW_279` | 2.79" | 142 × 428 | NV3007 | active low |
 
+### Third-party screens
+
+Not products — screens other people sell, which the library can drive. They are
+named by controller and the size the sketch sees, so they cannot be mistaken
+for the table above. Each carries its own pins (classic ESP32); override them
+with `setWiring()`.
+
+| Constant | Resolution | Driver | Bus | Backlight |
+|---|---|---|---|---|
+| `LB_ILI9327_400X240` | 400 × 240 | ILI9327 | 8-bit parallel | active high |
+| `LB_ILI9486_480X320` | 480 × 320 | ILI9486 | SPI, 18-bit colour | active high |
+| `LB_ILI9341_320X240` | 320 × 240 | ILI9341 | SPI | active high |
+
+Their pins are in `panels.yaml`. The ILI9486 module's resistive touch is not
+supported: its XPT2046 never answered on the pins we were given.
+
 **Every panel dims.** `backlight(0..255)` works the same on all of them — the
 library always drives the backlight with PWM, so full-on is just `255`. Whether
 the panel is wired active-low is the library's problem, not yours.

@@ -55,11 +55,14 @@ bool LB_Display::begin(bool useCanvas) {
     // that the driver allocates in PSRAM.
     _tft = new LB_RgbScreen(_panel);
   } else if (par8()) {
-    _bus = new LB_TFTPar8Bus(_wiringPar8.data, _wiringPar8.wr, _wiringPar8.dc);
+    _bus = new LB_TFTPar8Bus(_wiringPar8.data, _wiringPar8.wr, _wiringPar8.dc,
+                             _wiringPar8.cs, _wiringPar8.rd);
     _tft = new LB_TFT(_bus, _panel, _wiringPar8.rst);
   } else {
     _bus = new LB_TFTSpiBus(_wiring.dc, _wiring.cs, _wiring.sclk, _wiring.mosi,
-                            _wiring.spiHost);
+                            _wiring.spiHost, _wiring.miso);
+    // ILI9486 and ILI9488 take 18-bit colour only over SPI.
+    if (_panel->driver == LB_DRV_ILI9486) static_cast<LB_TFTSpiBus *>(_bus)->setPixel18(true);
     _tft = new LB_TFT(_bus, _panel, _wiring.rst);
   }
   // Colour order and inversion go in here, so anything set before begin()
@@ -124,6 +127,13 @@ void LB_Display::touchBegin() {
     const LB_RgbBoard *b = _panel->rgb;
     pins = {b->touchSda, b->touchScl, b->touchInt, b->touchRst,
             b->touchSck, b->touchMiso, b->touchMosi, b->touchCs};
+  } else if (_panel->spi) {
+    // Resistive touch on the display's own SPI bus: same SCLK/MISO/MOSI, its
+    // own CS and IRQ, and the display's SPIClass rather than a second claim on
+    // the pins.
+    const LB_SpiBoard &b = *_panel->spi;
+    pins = {-1, -1, b.touchIrq, -1, _wiring.sclk, _wiring.miso, _wiring.mosi, b.touchCs};
+    pins.spi = static_cast<LB_TFTSpiBus *>(_bus)->spi();
   } else {
     pins = {_wiringPar8.touchSda, _wiringPar8.touchScl, _wiringPar8.touchInt, _wiringPar8.touchRst,
             -1, -1, -1, -1};
@@ -227,7 +237,7 @@ void LB_Display::backlight(uint8_t level) {
 
 void LB_Display::printInfo(Print &out) const {
   static const char *kDrivers[] = {"ST7735", "ST7789", "ST7796", "NV3007",
-                                   "ILI9341", "ILI9488", "RGB (no controller)"};
+                                   "ILI9341", "ILI9488", "RGB (no controller)", "ILI9327", "ILI9486"};
   out.println(F("---- Lonely Binary Display ----"));
   out.printf("Panel      : %s (%s)\n", _panel->name, _panel->id);
   out.printf("Driver IC  : %s\n", kDrivers[_panel->driver]);
@@ -253,9 +263,9 @@ void LB_Display::printInfo(Print &out) const {
                b->de, b->vsync, b->hsync, b->pclk, b->backlight);
   } else if (par8()) {
     const LB_WiringPar8 &w = _wiringPar8;
-    out.printf("Pins       : D0-D7=%d,%d,%d,%d,%d,%d,%d,%d WR=%d DC=%d RST=%d BL=%d\n",
+    out.printf("Pins       : D0-D7=%d,%d,%d,%d,%d,%d,%d,%d WR=%d DC=%d RD=%d CS=%d RST=%d BL=%d\n",
                w.data[0], w.data[1], w.data[2], w.data[3], w.data[4], w.data[5],
-               w.data[6], w.data[7], w.wr, w.dc, w.rst, w.backlight);
+               w.data[6], w.data[7], w.wr, w.dc, w.rd, w.cs, w.rst, w.backlight);
   } else {
     out.printf("Pins       : CS=%d RST=%d DC=%d MOSI=%d SCLK=%d BL=%d\n",
                _wiring.cs, _wiring.rst, _wiring.dc,

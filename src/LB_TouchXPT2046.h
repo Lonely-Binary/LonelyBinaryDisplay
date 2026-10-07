@@ -32,7 +32,11 @@ class LB_TouchXPT2046 : public LB_Touch {
   LB_TouchXPT2046(int8_t sck, int8_t miso, int8_t mosi, int8_t cs, int8_t irq = -1,
                   uint32_t hz = 2000000)
       : _sck(sck), _miso(miso), _mosi(mosi), _cs(cs), _irq(irq), _hz(hz) {}
-  ~LB_TouchXPT2046() { delete _spi; }
+  ~LB_TouchXPT2046() { if (_ownSpi) delete _spi; }
+
+  // Share a bus the display already started (touch and display on the same
+  // SCLK/MISO/MOSI). Before begin().
+  void useSpi(SPIClass *spi) { _spi = spi; _ownSpi = false; }
 
   bool begin() override;
 
@@ -58,6 +62,7 @@ class LB_TouchXPT2046 : public LB_Touch {
   int8_t _sck, _miso, _mosi, _cs, _irq;
   uint32_t _hz;
   SPIClass *_spi = nullptr;
+  bool _ownSpi = true;
   int16_t _raw[4] = {0, 4095, 0, 4095};
   uint16_t _zMin = 400;
   int16_t _rx = 0, _ry = 0, _rz = 0;
@@ -75,8 +80,10 @@ inline bool LB_TouchXPT2046::begin() {
   if (_irq >= 0) pinMode(_irq, INPUT_PULLUP);
   // Its own SPI host: on these boards the touch sits alone (or with the TF
   // card) on a bus of its own, never with the display.
-  _spi = new SPIClass(FSPI);
-  _spi->begin(_sck, _miso, _mosi, -1);
+  if (_ownSpi) {
+    _spi = new SPIClass(FSPI);
+    _spi->begin(_sck, _miso, _mosi, -1);
+  }
   // If MISO reads back all ones, there is no chip there.
   const uint16_t z1 = sample(0xB1);
   // The low two bits of every command (PD1 PD0) set the state the chip is left
@@ -137,7 +144,9 @@ namespace {
 struct LB_TouchXPT2046Registrar {
   LB_TouchXPT2046Registrar() {
     LB_Touch::registerDriver(LB_TOUCH_XPT2046, [](const LB_TouchPins &p) -> LB_Touch * {
-      return new LB_TouchXPT2046(p.sck, p.miso, p.mosi, p.cs, p.intr);
+      auto *t = new LB_TouchXPT2046(p.sck, p.miso, p.mosi, p.cs, p.intr);
+      if (p.spi) t->useSpi((SPIClass *)p.spi);
+      return t;
     });
   }
 } lb_touchXPT2046Registrar;

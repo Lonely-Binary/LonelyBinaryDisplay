@@ -11,6 +11,8 @@ enum LB_Driver : uint8_t {
   LB_DRV_ILI9341,
   LB_DRV_ILI9488,
   LB_DRV_RGB,
+  LB_DRV_ILI9327,
+  LB_DRV_ILI9486,
 };
 
 // Panels whose controller needs a vendor init table that differs from the
@@ -30,6 +32,18 @@ struct LB_RgbBoard {
   int8_t   data[16];
   int8_t   touchSda, touchScl, touchInt, touchRst;      // I2C touch
   int8_t   touchSck, touchMiso, touchMosi, touchCs;     // SPI touch
+};
+
+// A loose 8-bit parallel module: its own pins, -1 = tied off on the module.
+struct LB_Par8Board {
+  int8_t data[8];   // D0..D7
+  int8_t wr, dc, rd, cs, rst, backlight;
+};
+
+// A loose SPI module: its own pins. The SPI host is not here, it follows the MCU.
+struct LB_SpiBoard {
+  int8_t cs, rst, dc, mosi, miso, sclk, backlight;
+  int8_t touchCs, touchIrq;   // resistive touch sharing the bus; -1 = none
 };
 
 enum LB_TouchCtl : uint8_t {
@@ -64,30 +78,37 @@ struct LB_PanelDef {
   bool             touchFlipY;
   const LB_RgbBoard *rgb;       // LB_BUS_RGB only, else nullptr
   int16_t          touchRaw[4]; // resistive: raw x at left, right; y at top, bottom
+  const LB_Par8Board *par8;     // LB_BUS_PAR8 with its own pins, else nullptr
+  const LB_SpiBoard  *spi;      // LB_BUS_SPI with its own pins, else nullptr
 };
 
 static const LB_RgbBoard LB_RGB_SUNTON_4827S043R = { 8000000, 4, 43, 8, 4, 12, 8, true, 40, 41, 39, 42, 2, {8, 3, 46, 9, 1, 5, 6, 7, 15, 16, 4, 45, 48, 47, 21, 14}, -1, -1, 18, -1, 12, 13, 11, 38 };
 static const LB_RgbBoard LB_RGB_SUNTON_8048S070C = { 12500000, 30, 16, 210, 13, 10, 22, true, 41, 40, 39, 42, 2, {15, 7, 6, 5, 4, 9, 46, 3, 8, 16, 1, 14, 21, 47, 48, 45}, 19, 20, -1, 38, -1, -1, -1, -1 };
+static const LB_SpiBoard LB_SPI_ILI9486_480X320 = { 16, -1, 0, 23, 19, 18, 2, 15, 4 };
+static const LB_Par8Board LB_PAR8_ILI9327_400X240 = { {14, 12, 13, 15, 2, 4, 16, 17}, 33, 27, 5, 26, 18, 32 };
 
 static const LB_PanelDef LB_PANELS[] = {
-  { "tft_096", "0.96 inch", LB_DRV_ST7735, 80, 160, 0, true, false, false, false, 24, 0, 24, 0, 20000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "tft_18", "1.8 inch", LB_DRV_ST7735, 128, 160, 0, false, true, true, true, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "tft_20", "2.0 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "tft_24", "2.4 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "tft_28", "2.8 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "tft_35", "3.5 inch", LB_DRV_ST7796, 320, 480, 0, true, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "narrow_114", "1.14 inch", LB_DRV_ST7789, 135, 240, 1, false, true, false, false, 52, 40, 53, 40, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "narrow_168", "1.68 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "narrow_19", "1.9 inch", LB_DRV_ST7789, 170, 320, 1, false, true, false, false, 35, 0, 35, 0, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "narrow_225", "2.25 inch", LB_DRV_ST7789, 76, 284, 1, false, false, false, false, 82, 18, 82, 18, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "narrow_279", "2.79 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 20000000, true, LB_INIT_NV3007_279, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "square_392_ctp", "3.92 inch square, capacitive touch", LB_DRV_ILI9488, 320, 320, 0, true, true, false, false, 0, 0, 0, 160, 0, false, LB_INIT_NONE, LB_BUS_PAR8, LB_TOUCH_GT911, false, false, false, nullptr, {0, 0, 0, 0} },
-  { "sunton_4827s043r", "Sunton ESP32-4827S043R", LB_DRV_RGB, 480, 272, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_XPT2046, false, false, false, &LB_RGB_SUNTON_4827S043R, {188, 3951, 254, 3791} },
-  { "sunton_8048s070c", "Sunton ESP32-8048S070C", LB_DRV_RGB, 800, 480, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_GT911, false, false, false, &LB_RGB_SUNTON_8048S070C, {0, 0, 0, 0} },
-  { "ili9341_240x320", "ILI9341 240x320", LB_DRV_ILI9341, 240, 320, 0, true, false, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0} },
+  { "tft_096", "0.96 inch", LB_DRV_ST7735, 80, 160, 0, true, false, false, false, 24, 0, 24, 0, 20000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "tft_18", "1.8 inch", LB_DRV_ST7735, 128, 160, 0, false, true, true, true, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "tft_20", "2.0 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "tft_24", "2.4 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "tft_28", "2.8 inch", LB_DRV_ST7789, 240, 320, 0, false, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "tft_35", "3.5 inch", LB_DRV_ST7796, 320, 480, 0, true, true, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "narrow_114", "1.14 inch", LB_DRV_ST7789, 135, 240, 1, false, true, false, false, 52, 40, 53, 40, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "narrow_168", "1.68 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "narrow_19", "1.9 inch", LB_DRV_ST7789, 170, 320, 1, false, true, false, false, 35, 0, 35, 0, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "narrow_225", "2.25 inch", LB_DRV_ST7789, 76, 284, 1, false, false, false, false, 82, 18, 82, 18, 8000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "narrow_279", "2.79 inch", LB_DRV_NV3007, 142, 428, 1, false, false, false, false, 12, 0, 14, 0, 20000000, true, LB_INIT_NV3007_279, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "square_392_ctp", "3.92 inch square, capacitive touch", LB_DRV_ILI9488, 320, 320, 0, true, true, false, false, 0, 0, 0, 160, 0, false, LB_INIT_NONE, LB_BUS_PAR8, LB_TOUCH_GT911, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "sunton_4827s043r", "Sunton ESP32-4827S043R", LB_DRV_RGB, 480, 272, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_XPT2046, false, false, false, &LB_RGB_SUNTON_4827S043R, {188, 3951, 254, 3791}, nullptr, nullptr },
+  { "sunton_8048s070c", "Sunton ESP32-8048S070C", LB_DRV_RGB, 800, 480, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_GT911, false, false, false, &LB_RGB_SUNTON_8048S070C, {0, 0, 0, 0}, nullptr, nullptr },
+  { "ili9341_240x320", "ILI9341 240x320", LB_DRV_ILI9341, 240, 320, 0, true, false, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "ili9327_400x240", "ILI9327 400x240", LB_DRV_ILI9327, 240, 400, 1, true, false, false, false, 0, 0, 0, 32, 0, false, LB_INIT_NONE, LB_BUS_PAR8, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, &LB_PAR8_ILI9327_400X240, nullptr },
+  { "ili9486_480x320", "ILI9486 480x320", LB_DRV_ILI9486, 320, 480, 3, true, false, false, false, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, &LB_SPI_ILI9486_480X320 },
+  { "ili9341_320x240", "ILI9341 320x240", LB_DRV_ILI9341, 240, 320, 1, true, false, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
 };
 
-#define LB_PANEL_COUNT 15
+#define LB_PANEL_COUNT 18
 
 // Pass one of these to LB_Display. Changing this constant is the only
 // edit needed to swap panels — everything else is inherited.
@@ -112,3 +133,6 @@ static const LB_PanelDef LB_PANELS[] = {
 #define LB_SUNTON_4827S043R (&LB_PANELS[12])   // RGB 480x272
 #define LB_SUNTON_8048S070C (&LB_PANELS[13])   // RGB 800x480
 #define LB_ILI9341_240X320  (&LB_PANELS[14])   // ILI9341 240x320
+#define LB_ILI9327_400X240  (&LB_PANELS[15])   // ILI9327 240x400
+#define LB_ILI9486_480X320  (&LB_PANELS[16])   // ILI9486 320x480
+#define LB_ILI9341_320X240  (&LB_PANELS[17])   // ILI9341 240x320
