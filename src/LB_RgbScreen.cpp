@@ -49,7 +49,11 @@ bool LB_RgbScreen::begin(int32_t, bool, bool) {
   // reads PSRAM directly, and when the CPU is busy in PSRAM too - LVGL blending
   // a translucent overlay over the whole 7" screen - it starves and the picture
   // tears. Ten lines each; the size must divide the frame evenly.
-  cfg.bounce_buffer_size_px = (size_t)_panel->width * 10;
+  // ESP-IDF wants the frame to be a whole number of bounce buffers: the most lines up to ten that divide the panel's height
+  // (480 -> 10, 272 -> 8). A height with no divisor between 2 and 10 goes without bounce buffers.
+  uint16_t bounceLines = 0;
+  for (uint16_t n = 10; n >= 2; n--) if (_panel->height % n == 0) { bounceLines = n; break; }
+  cfg.bounce_buffer_size_px = (size_t)_panel->width * bounceLines;
   cfg.dma_burst_size = 64;
   cfg.hsync_gpio_num = b->hsync;
   cfg.vsync_gpio_num = b->vsync;
