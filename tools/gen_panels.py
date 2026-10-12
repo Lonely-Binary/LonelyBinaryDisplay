@@ -124,6 +124,9 @@ def gen_header(doc) -> str:
         "  int8_t   data[16];",
         "  int8_t   touchSda, touchScl, touchInt, touchRst;      // I2C touch",
         "  int8_t   touchSck, touchMiso, touchMosi, touchCs;     // SPI touch",
+        "  // Appended, so older initialisers still compile (as false, false).",
+        "  bool     syncIdleHigh;   // sync pulses are active LOW (idle high); false = idle low, as a DE-mode panel is run",
+        "  bool     directScan;     // scanned straight out of ONE PSRAM frame buffer: no bounce buffers, no second buffer",
         "};",
         "",
         "// A loose 8-bit parallel module: its own pins, -1 = tied off on the module.",
@@ -186,7 +189,8 @@ def gen_header(doc) -> str:
             f"{cbool(r.get('pclk_active_neg'))}, {pins['de']}, {pins['vsync']}, {pins['hsync']}, "
             f"{pins['pclk']}, {pins['backlight']}, {{{', '.join(map(str, data))}}}, "
             f"{tp('sda')}, {tp('scl')}, {tp('int')}, {tp('rst')}, "
-            f"{tp('sck')}, {tp('miso')}, {tp('mosi')}, {tp('cs')} }};"
+            f"{tp('sck')}, {tp('miso')}, {tp('mosi')}, {tp('cs')}, "
+            f"{cbool(r.get('sync_idle_high'))}, {cbool(r.get('direct_scan'))} }};"
         )
     for p in panels:
         if "spi" not in p:
