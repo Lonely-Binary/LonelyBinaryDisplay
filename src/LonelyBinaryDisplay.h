@@ -202,6 +202,8 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   // to draw without tearing. Plain drawing ignores them and uses framebuffer().
   uint16_t *framebuffer2() const { return _tft ? _tft->framebuffer2() : nullptr; }
   void present(const uint16_t *buf) { if (_tft) _tft->present(buf); }
+  // RGB panels: frames scanned out, frames whose length was off by more than 2 % (a late refill), the longest in microseconds.
+  bool scanStats(uint32_t *frames, uint32_t *off, uint32_t *maxUs) { return _tft && _tft->scanStats(frames, off, maxUs); }
 
 
   // Backlight, 0 = off, 255 = full. Panels wired active-low and panels with

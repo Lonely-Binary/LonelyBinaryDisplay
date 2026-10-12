@@ -122,6 +122,9 @@ public:
    * buffer, or nullptr; and present(), which makes `fb` the one on screen at
    * the next vertical blank and returns once it is - so the other buffer is
    * no longer being scanned and can be drawn into without tearing. */
+  // RGB panels only: how many frames the scan-out has finished, how many of them took more than 2 % longer or shorter than the timing
+  // says (a late refill or a restart), and the longest one in microseconds. False when the panel has none.
+  virtual bool scanStats(uint32_t *frames, uint32_t *off, uint32_t *maxUs) { (void)frames; (void)off; (void)maxUs; return false; }
   virtual uint16_t *framebuffer2() const { return nullptr; }
   virtual void present(const uint16_t *fb) { flushFramebuffer(fb); }
 };
