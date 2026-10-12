@@ -4,11 +4,24 @@
 #if SOC_LCD_RGB_SUPPORTED
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_rgb.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
+// Frame timing, kept by the vertical-blank interrupt: a frame that is not as long as the timing says was refilled late or restarted.
+static volatile uint32_t s_frames = 0, s_off = 0, s_maxUs = 0, s_expectUs = 0;
+static volatile int64_t s_lastUs = 0;
 static bool IRAM_ATTR lb_rgb_on_vsync(esp_lcd_panel_handle_t, const esp_lcd_rgb_panel_event_data_t *,
                                       void *ctx) {
+  const int64_t now = esp_timer_get_time();
+  if (s_lastUs && s_expectUs) {
+    const uint32_t dt = (uint32_t)(now - s_lastUs);
+    s_frames = s_frames + 1;
+    const uint32_t tol = s_expectUs / 50;
+    if (dt + tol < s_expectUs || dt > s_expectUs + tol) s_off = s_off + 1;
+    if (dt > s_maxUs) s_maxUs = dt;
+  }
+  s_lastUs = now;
   BaseType_t woken = pdFALSE;
   xSemaphoreGiveFromISR((SemaphoreHandle_t)ctx, &woken);
   return woken == pdTRUE;
@@ -38,22 +51,41 @@ bool LB_RgbScreen::begin(int32_t, bool, bool) {
   cfg.timings.vsync_pulse_width = b->vsPulse;
   cfg.timings.vsync_back_porch = b->vsBack;
   cfg.timings.vsync_front_porch = b->vsFront;
-  cfg.timings.flags.hsync_idle_low = 1;
-  cfg.timings.flags.vsync_idle_low = 1;
+  // Which way the sync pulses go (`syncIdleHigh`, panels.yaml). The 7-inch panel runs in DE mode and ignores them; the 4.3-inch one
+  // takes its frame start from the vertical sync, and with the pulse the wrong way round it locked on to a different line on about
+  // four boots in ten and stayed there until the next boot.
+  cfg.timings.flags.hsync_idle_low = b->syncIdleHigh ? 0 : 1;
+  cfg.timings.flags.vsync_idle_low = b->syncIdleHigh ? 0 : 1;
   cfg.timings.flags.pclk_active_neg = b->pclkActiveNeg;
   cfg.data_width = 16;
   cfg.bits_per_pixel = 16;
-  cfg.num_fbs = 2;
+  // `directScan` (panels.yaml): scanned straight out of PSRAM with ONE frame buffer: with two and no bounce buffers the picture
+  // alternated between them and showed two pages on top of each other after a page change. LVGL then draws into the buffer on show
+  // (small areas, so a little tearing at worst, as in the Arduino_GFX Sunton configurations).
+  const bool direct = b->directScan;
+  cfg.num_fbs = direct ? 1 : 2;
   // Bounce buffers: the scan-out DMA reads two small buffers in internal SRAM,
   // refilled from the PSRAM framebuffer by an interrupt. Without them the DMA
   // reads PSRAM directly, and when the CPU is busy in PSRAM too - LVGL blending
   // a translucent overlay over the whole 7" screen - it starves and the picture
   // tears. Ten lines each; the size must divide the frame evenly.
-  // ESP-IDF wants the frame to be a whole number of bounce buffers: the most lines up to ten that divide the panel's height
-  // (480 -> 10, 272 -> 8). A height with no divisor between 2 and 10 goes without bounce buffers.
+  // ESP-IDF wants the frame to be a whole number of bounce buffers, and the two buffers are used in turn, so the number of buffers
+  // per frame must be EVEN (an odd count swaps their roles every frame and the picture jumps up and down: 272 / 16 = 17 did exactly
+  // that). Each refill is also a deadline: the buffer is read out in (lines x line time) and the interrupt must have copied the next
+  // one from PSRAM by then. A smaller panel has a shorter line (480 px at 8 MHz is 67 us against the 7-inch's 86 us), so eight lines
+  // is little room there: the picture shows stale lines when Wi-Fi and the renderer fight over PSRAM. Take the smallest line count
+  // of at least ten that divides the height into an even number of buffers (480 -> 10, as before; 272 -> 17, 1.1 ms); a height with
+  // none up to 40 takes the largest below ten that does, and one with none at all goes without bounce buffers.
   uint16_t bounceLines = 0;
-  for (uint16_t n = 10; n >= 2; n--) if (_panel->height % n == 0) { bounceLines = n; break; }
-  cfg.bounce_buffer_size_px = (size_t)_panel->width * bounceLines;
+  for (uint16_t n = 10; n <= 40 && !bounceLines; n++) if (_panel->height % n == 0 && (_panel->height / n) % 2 == 0) bounceLines = n;
+  for (uint16_t n = 9; n >= 2 && !bounceLines; n--) if (_panel->height % n == 0 && (_panel->height / n) % 2 == 0) bounceLines = n;
+  // A directScan panel has no bounce buffers, as the widely used Sunton configurations: its 10 MHz clock needs 20 MB/s, which the PSRAM
+  // has plenty of. The bounce-buffer scheme counts refills in software, and one missed refill at start-up left the picture shifted
+  // until the next boot (about four boots in ten, measured on the board).
+#ifdef LB_RGB_BOUNCE_LINES
+  bounceLines = LB_RGB_BOUNCE_LINES;   // a build may force it (0 = none) to compare
+#endif
+  cfg.bounce_buffer_size_px = direct ? 0 : (size_t)_panel->width * bounceLines;
   cfg.dma_burst_size = 64;
   cfg.hsync_gpio_num = b->hsync;
   cfg.vsync_gpio_num = b->vsync;
@@ -76,16 +108,21 @@ bool LB_RgbScreen::begin(int32_t, bool, bool) {
     return false;
   }
   esp_lcd_panel_reset(h);
-  esp_lcd_panel_init(h);
+  // The buffers are cleared BEFORE the scan-out starts: clearing 500 KB of PSRAM while the first frames are being read out made the
+  // start race with it.
   void *fb = nullptr, *fb2 = nullptr;
   if (cfg.num_fbs == 2) esp_lcd_rgb_panel_get_frame_buffer(h, 2, &fb, &fb2);
   else esp_lcd_rgb_panel_get_frame_buffer(h, 1, &fb);
+  {
+    const size_t cleared = (size_t)_panel->width * _panel->height * 2;
+    if (fb) memset(fb, 0, cleared);
+    if (fb2) memset(fb2, 0, cleared);
+  }
+  esp_lcd_panel_init(h);
   _handle = h;
+  s_expectUs = (uint32_t)(1000000.0 * (b->hsPulse + b->hsBack + _panel->width + b->hsFront) * (b->vsPulse + b->vsBack + _panel->height + b->vsFront) / b->pclkHz);
   _fb = (uint16_t *)fb;
   _fb2 = (uint16_t *)fb2;
-  const size_t bytes = (size_t)_panel->width * _panel->height * 2;
-  memset(_fb, 0, bytes);
-  if (_fb2) memset(_fb2, 0, bytes);
   sync(0, 0, _panel->width, _panel->height);
 
   _vsync = xSemaphoreCreateBinary();
@@ -160,4 +197,15 @@ void LB_RgbScreen::flushFramebuffer(const uint16_t *fb) {
   // nothing to copy - only the cache to write back.
   if (fb == _fb) sync(0, 0, _panel->width, _panel->height);
   else pushImage(0, 0, _panel->width, _panel->height, fb);
+}
+
+bool LB_RgbScreen::scanStats(uint32_t *frames, uint32_t *off, uint32_t *maxUs) {
+#if SOC_LCD_RGB_SUPPORTED
+  if (frames) *frames = s_frames;
+  if (off) *off = s_off;
+  if (maxUs) *maxUs = s_maxUs;
+  return s_expectUs != 0;
+#else
+  (void)frames; (void)off; (void)maxUs; return false;
+#endif
 }

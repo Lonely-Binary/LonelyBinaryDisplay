@@ -362,7 +362,13 @@ panels:
     invert: false
     backlight_active_low: false
     rgb:
-      pclk_hz: 8000000
+      pclk_hz: 10000000
+      # Sunton's own demo: sync polarity 0 (active low), no bounce buffers. The 4.3" panel takes its frame start from the vertical
+      # sync, and with the pulse the other way round it locked on to a different line on about four boots in ten.
+      sync_idle_high: true
+      # One frame buffer scanned straight out of PSRAM: the bounce-buffer scheme (refilled by an interrupt, counted in software) lost
+      # a refill at start-up and stayed shifted; two buffers without it alternated and showed two pages on top of each other.
+      direct_scan: true
       hsync: {pulse: 4, back: 43, front: 8}
       vsync: {pulse: 4, back: 12, front: 8}
       pclk_active_neg: true
