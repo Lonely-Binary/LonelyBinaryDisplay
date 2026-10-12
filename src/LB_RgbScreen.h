@@ -42,6 +42,7 @@ public:
   uint16_t *framebuffer() const override { return _fb; }
   void flushFramebuffer(const uint16_t *fb) override;
   uint16_t *framebuffer2() const override { return _fb2; }
+  bool scanStats(uint32_t *frames, uint32_t *off, uint32_t *maxUs) override;
   void present(const uint16_t *fb) override;
 
 private:

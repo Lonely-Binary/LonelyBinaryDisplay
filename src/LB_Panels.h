@@ -32,6 +32,9 @@ struct LB_RgbBoard {
   int8_t   data[16];
   int8_t   touchSda, touchScl, touchInt, touchRst;      // I2C touch
   int8_t   touchSck, touchMiso, touchMosi, touchCs;     // SPI touch
+  // Appended, so older initialisers still compile (as false, false).
+  bool     syncIdleHigh;   // sync pulses are active LOW (idle high); false = idle low, as a DE-mode panel is run
+  bool     directScan;     // scanned straight out of ONE PSRAM frame buffer: no bounce buffers, no second buffer
 };
 
 // A loose 8-bit parallel module: its own pins, -1 = tied off on the module.
@@ -82,8 +85,8 @@ struct LB_PanelDef {
   const LB_SpiBoard  *spi;      // LB_BUS_SPI with its own pins, else nullptr
 };
 
-static const LB_RgbBoard LB_RGB_SUNTON_4827S043R = { 8000000, 4, 43, 8, 4, 12, 8, true, 40, 41, 39, 42, 2, {8, 3, 46, 9, 1, 5, 6, 7, 15, 16, 4, 45, 48, 47, 21, 14}, -1, -1, 18, -1, 12, 13, 11, 38 };
-static const LB_RgbBoard LB_RGB_SUNTON_8048S070C = { 12500000, 30, 16, 210, 13, 10, 22, true, 41, 40, 39, 42, 2, {15, 7, 6, 5, 4, 9, 46, 3, 8, 16, 1, 14, 21, 47, 48, 45}, 19, 20, -1, 38, -1, -1, -1, -1 };
+static const LB_RgbBoard LB_RGB_SUNTON_4827S043R = { 10000000, 4, 43, 8, 4, 12, 8, true, 40, 41, 39, 42, 2, {8, 3, 46, 9, 1, 5, 6, 7, 15, 16, 4, 45, 48, 47, 21, 14}, -1, -1, 18, -1, 12, 13, 11, 38, true, true };
+static const LB_RgbBoard LB_RGB_SUNTON_8048S070C = { 12500000, 30, 16, 210, 13, 10, 22, true, 41, 40, 39, 42, 2, {15, 7, 6, 5, 4, 9, 46, 3, 8, 16, 1, 14, 21, 47, 48, 45}, 19, 20, -1, 38, -1, -1, -1, -1, false, false };
 static const LB_SpiBoard LB_SPI_ILI9486_480X320 = { 16, -1, 0, 23, 19, 18, 2, 15, 4 };
 static const LB_Par8Board LB_PAR8_ILI9327_400X240 = { {14, 12, 13, 15, 2, 4, 16, 17}, 33, 27, 5, 26, 18, 32 };
 
