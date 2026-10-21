@@ -63,7 +63,11 @@ bool LB_Display::begin(bool useCanvas) {
                             _wiring.spiHost, _wiring.miso);
     // ILI9486 and ILI9488 take 18-bit colour only over SPI.
     if (_panel->driver == LB_DRV_ILI9486) static_cast<LB_TFTSpiBus *>(_bus)->setPixel18(true);
-    _tft = new LB_TFT(_bus, _panel, _wiring.rst);
+    // ST7305 is 1 bit per pixel in a layout of its own, so it has its own driver.
+    if (_panel->driver == LB_DRV_ST7305)
+      _tft = new LB_ST7305(_bus, _panel, _wiring.rst);
+    else
+      _tft = new LB_TFT(_bus, _panel, _wiring.rst);
   }
   // Colour order and inversion go in here, so anything set before begin()
   // is what the panel comes up with. _inverted starts as the panel table's
@@ -237,7 +241,7 @@ void LB_Display::backlight(uint8_t level) {
 
 void LB_Display::printInfo(Print &out) const {
   static const char *kDrivers[] = {"ST7735", "ST7789", "ST7796", "NV3007",
-                                   "ILI9341", "ILI9488", "RGB (no controller)", "ILI9327", "ILI9486"};
+                                   "ILI9341", "ILI9488", "RGB (no controller)", "ILI9327", "ILI9486", "ST7305"};
   out.println(F("---- Lonely Binary Display ----"));
   out.printf("Panel      : %s (%s)\n", _panel->name, _panel->id);
   out.printf("Driver IC  : %s\n", kDrivers[_panel->driver]);
