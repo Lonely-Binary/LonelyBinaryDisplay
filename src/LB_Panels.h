@@ -13,6 +13,7 @@ enum LB_Driver : uint8_t {
   LB_DRV_RGB,
   LB_DRV_ILI9327,
   LB_DRV_ILI9486,
+  LB_DRV_ST7305,
 };
 
 // Panels whose controller needs a vendor init table that differs from the
@@ -109,9 +110,10 @@ static const LB_PanelDef LB_PANELS[] = {
   { "ili9327_400x240", "ILI9327 400x240", LB_DRV_ILI9327, 240, 400, 1, true, false, false, false, 0, 0, 0, 32, 0, false, LB_INIT_NONE, LB_BUS_PAR8, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, &LB_PAR8_ILI9327_400X240, nullptr },
   { "ili9486_480x320", "ILI9486 480x320", LB_DRV_ILI9486, 320, 480, 3, true, false, false, false, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, &LB_SPI_ILI9486_480X320 },
   { "ili9341_320x240", "ILI9341 320x240", LB_DRV_ILI9341, 240, 320, 1, true, false, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
+  { "st7305_400x300", "ST7305 400x300 RLCD", LB_DRV_ST7305, 400, 300, 0, false, true, false, false, 0, 0, 0, 0, 10000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
 };
 
-#define LB_PANEL_COUNT 18
+#define LB_PANEL_COUNT 19
 
 // Pass one of these to LB_Display. Changing this constant is the only
 // edit needed to swap panels — everything else is inherited.
@@ -139,3 +141,4 @@ static const LB_PanelDef LB_PANELS[] = {
 #define LB_ILI9327_400X240  (&LB_PANELS[15])   // ILI9327 240x400
 #define LB_ILI9486_480X320  (&LB_PANELS[16])   // ILI9486 320x480
 #define LB_ILI9341_320X240  (&LB_PANELS[17])   // ILI9341 240x320
+#define LB_ST7305_400X300   (&LB_PANELS[18])   // ST7305 400x300

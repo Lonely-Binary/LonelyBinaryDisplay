@@ -143,6 +143,7 @@ controller may well need `setColorOrder()` / `setInverted()` /
 | ILI9327 | `LB_ILI9327_400X240` | not supported | 400 x 240 | ILI9327 | 8-bit parallel | — | active high |
 | ILI9486 | `LB_ILI9486_480X320` | not supported | 480 x 320 | ILI9486 | SPI 20 MHz | — | active high |
 | ILI9341 | `LB_ILI9341_320X240` | not supported | 320 x 240 | ILI9341 | SPI 40 MHz | — | active high |
+| ST7305 | `LB_ST7305_400X300` | not supported | 400 x 300 | ST7305 | SPI 10 MHz | — | active high |
 
 <!-- END GENERATED PANEL TABLE -->
 

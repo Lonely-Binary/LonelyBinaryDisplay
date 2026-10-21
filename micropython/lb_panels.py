@@ -230,6 +230,23 @@ ILI9341_320X240 = {
     "bl_active_low": False,
 }
 
+ST7305_400X300 = {
+    "id": "st7305_400x300",
+    "name": "ST7305 400x300 RLCD",
+    "cls": "ST7305",
+    "width": 400,
+    "height": 300,
+    "rotation": 0,
+    "xstart": 0,
+    "ystart": 0,
+    "bgr": False,
+    "invert": True,
+    "flip_x": False,
+    "flip_y": False,
+    "baudrate": 10000000,
+    "bl_active_low": False,
+}
+
 # Panels Lonely Binary sells.
 PRODUCTS = {
     "tft_096": TFT_096,
@@ -260,4 +277,5 @@ PANELS = {
     "narrow_279": NARROW_279,
     "ili9341_240x320": ILI9341_240X320,
     "ili9341_320x240": ILI9341_320X240,
+    "st7305_400x300": ST7305_400X300,
 }
