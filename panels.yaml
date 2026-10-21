@@ -557,3 +557,28 @@ panels:
     backlight_active_low: false
     notes: ili9341_240x320 turned 90 degrees; native size and every other value are the same.
 
+  # ── ST7305 400x300 reflective monochrome LCD, SPI ───────────────────────────
+  #
+  # Not e-paper: a frame is a few milliseconds, nothing ghosts, there is no BUSY
+  # pin and no backlight (the driver ignores the breakout's backlight pin). It
+  # is 1 bit per pixel; the sketch still draws in colour and flush() thresholds
+  # to black and white. Needs PSRAM for the 240 KB canvas.
+  # Pins are the standard breakout (S3: CS 10, DC 2, MOSI 11, SCLK 12, RST 42).
+  - id: st7305_400x300
+    product: false
+    const: LB_ST7305_400X300
+    name: 'ST7305 400x300 RLCD'
+    family: generic
+    driver: ST7305
+    width: 400
+    height: 300
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: true        # verified 2026-10-21: INVON gives black ink on a white page
+    spi_hz: 10000000    # UNVERIFIED - conservative, a frame is 15 KB (~12 ms)
+    backlight_active_low: false
+    notes: >-
+      Third-party 4.2" reflective LCD (Waveshare ESP32-S3-RLCD-4.2 uses it). Init values and the
+      2x4-block pixel layout come from Waveshare's reference driver; nothing here has been run
+      on a Lonely Binary bench yet. Rotation 0 and 2 only while a canvas exists (always, here).
