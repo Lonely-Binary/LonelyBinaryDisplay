@@ -27,6 +27,7 @@ static const LB_Ctl kCtl[] = {
   /* RGB     */ { 0,   false, true  },  // never reached: no controller to reset
   /* ILI9327 */ { 150, true,  false },  // MCUFRIEND_kbv: SWRESET + 150 ms
   /* ILI9486 */ { 120, false, false },
+  /* ST7305  */ { 50,  false, true  },  // never reached: LB_ST7305 drives it
 };
 
 static const uint8_t *initTable(const LB_PanelDef *p) {
@@ -47,6 +48,7 @@ static const uint8_t *initTable(const LB_PanelDef *p) {
     case LB_DRV_ILI9327: return LB_INITSEQ_ILI9327;
     case LB_DRV_ILI9486: return LB_INITSEQ_ILI9486;
     case LB_DRV_RGB:
+    case LB_DRV_ST7305:
       break;  // no controller, so no init table: LB_RgbScreen drives these
   }
   return nullptr;

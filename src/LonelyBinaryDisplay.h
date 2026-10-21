@@ -33,6 +33,7 @@
 #include "LB_TFTPanel.h"
 #include "LB_TFTPar8Bus.h"
 #include "LB_RgbScreen.h"
+#include "LB_ST7305.h"
 #include "LB_Touch.h"
 #include "LB_Colors.h"
 #include "LB_Panels.h"
@@ -267,6 +268,7 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   bool par8() const { return _panel->bus == LB_BUS_PAR8; }
   bool rgb() const { return _panel->bus == LB_BUS_RGB; }
   int8_t blPin() const {
+    if (_panel->driver == LB_DRV_ST7305) return -1;   // reflective: no backlight
     return rgb() ? _panel->rgb->backlight : par8() ? _wiringPar8.backlight : _wiring.backlight;
   }
 };
