@@ -281,6 +281,15 @@ CST816D. It is wired on its own pins, not the breakout: D0-D7 on GPIO 5, 6, 4, 7
 SCL 12, and no reset, backlight or interrupt pins. Not yet run through this
 library; `examples/TapCheck` is the first thing to try.
 
+The resistive RTP series (`LB_RTP_180`, `LB_RTP_240`, `LB_RTP_280`, `LB_RTP_430`: 1.8, 2.4,
+2.8 and 4.3 inch) reads an NS2009 over I2C: `#include <LB_TouchNS2009.h>`. A resistive layer
+needs a firm press (a stylus or a fingernail) and reports raw numbers, not pixels, so every layer is
+calibrated: `LB_TouchCalibration.h` shows four crosses, fits the layer from four presses, applies
+the result and can keep it in the chip's flash. `examples/RtpCheck` is the first power-on test
+(calibration, backlight, colours, edges, a backlight page) and `examples/RtpShowcase` a touch
+show-reel (paint, whack-a-mole, a colour mixer). The 4.3 inch panel's backlight is held to 50 %
+in the examples: at full brightness it makes the dev board's LDO too hot.
+
 Measured on the 3.92" square (`LB_SQUARE_392_CTP`), classic ESP32, SDA 21
 SCL 22 INT 18 RST 19: the GT911 reports 320 x 320 in the same orientation as
 display rotation 0. All four rotations were checked on hardware, 5/5 targets

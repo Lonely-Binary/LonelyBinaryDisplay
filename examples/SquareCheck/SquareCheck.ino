@@ -15,6 +15,11 @@
 
 // Change this one line for another size:  LB_SQUARE_085   LB_SQUARE_133   LB_SQUARE_154   LB_SQUARE_200   LB_SQUARE_231   LB_SQUARE_392
 LB_Display display(LB_SQUARE_392);
+//LB_Display display(LB_SQUARE_085);
+//LB_Display display(LB_SQUARE_133);
+//LB_Display display(LB_SQUARE_154);
+//LB_Display display(LB_SQUARE_200);
+//LB_Display display(LB_SQUARE_231);
 
 static void colourPage(lb_color_t bg, const char *name) {
   display.fillScreen(bg);

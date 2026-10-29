@@ -10,7 +10,9 @@
 */
 #include <LonelyBinaryDisplay.h>
 
-LB_Display display(LB_RLCD_213);   // or LB_RLCD_290, LB_RLCD_420
+LB_Display display(LB_RLCD_213);
+//LB_Display display(LB_RLCD_290);
+//LB_Display display(LB_RLCD_420);
 
 void setup() {
   Serial.begin(115200);

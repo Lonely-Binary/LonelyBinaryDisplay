@@ -61,6 +61,9 @@ class LB_Touch {
   void setRotation(uint8_t r) { _rotation = r & 3; }
   uint8_t rotation() const { return _rotation; }
 
+  // Whether the axes are swapped, for a driver that maps raw readings to the frame the swap acts on.
+  bool swapXY() const { return _swapXY; }
+
   // How the touch layer sits relative to display rotation 0. The panel table
   // carries this; call it yourself only for a panel it does not know.
   void setOrientation(bool swapXY, bool flipX, bool flipY) {
