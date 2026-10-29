@@ -14,13 +14,16 @@
  * Drawing is done in an RGB565 canvas like every other Lonely Binary panel,
  * so a sketch written for a colour TFT runs unchanged; flush() thresholds the
  * canvas to black and white (luma >= 128 is white) and packs it. The canvas
- * lives in PSRAM (400 x 300 x 2 = 240 KB), the packed frame in internal RAM
- * (15 KB).
+ * lives in PSRAM when there is some (the 4.2 inch needs 240 KB), else in
+ * internal RAM (the 2.13 inch needs 61 KB, the 2.9 inch 129 KB); the packed
+ * frame is 4 to 15 KB of internal RAM.
  *
- * Init values and the pixel layout were read from Waveshare's reference driver
- * for their ESP32-S3-RLCD-4.2 (via the Apache-2.0 ESPHome port by kylehase);
- * the code here is written for this library, not copied. UNVERIFIED on a
- * Lonely Binary bench until the first panel is run - see panels.yaml.
+ * One controller, four glasses: LB_ST7305.cpp has a small table per panel (init
+ * values, RAM window, how pixels pack into bytes), chosen by init_ops. The
+ * 400 x 300 Waveshare values were read from their reference driver (via the
+ * Apache-2.0 ESPHome port by kylehase); the OSPTEK 2.13, 2.9 and 4.2 ones are
+ * from the vendor's own test sketches. The code here is written for this
+ * library, not copied. See panels.yaml for which have been run on a bench.
  */
 #include "LB_TFT.h"
 
@@ -48,6 +51,7 @@ public:
   /* The canvas, allocated here: a 1-bit panel still draws in RGB565. */
   uint16_t *framebuffer() const override { return _fb; }
   void flushFramebuffer(const uint16_t *fb) override;
+  void setLowPower(bool low) override;
 
 private:
   LB_TFTBus *_bus;
@@ -58,6 +62,10 @@ private:
   int16_t _w = 0, _h = 0;   /* current (rotated) size */
   uint16_t *_fb = nullptr;
   uint8_t *_packed = nullptr;
+  size_t _packedLen = 0;
+  bool _low = false;                 /* in the low-power refresh mode */
+  const struct LB_St7305Cfg *_cfg = nullptr;
 
   void cmd(uint8_t c, const uint8_t *d = nullptr, uint8_t n = 0);
+  void runTable(const uint8_t *t);
 };

@@ -47,6 +47,12 @@ wiring:
     spi_host: HSPI      # Arduino_GFX: SPI3 on the S3
     mp_spi_id: 1        # MicroPython: SPI(1) is the S3's FSPI on these native pins
     psram: true
+    # I2C touch for the capacitive SPI panels (tap series). From the 1.28 inch
+    # bench rig, 2026-10-29.
+    touch_sda: 4
+    touch_scl: 6
+    touch_int: 5
+    touch_rst: 7
   esp32:
     cs: 15
     rst: 4
@@ -58,6 +64,12 @@ wiring:
     spi_host: VSPI      # Arduino_GFX: NOT FSPI — that is the on-chip flash bus
     mp_spi_id: 2        # MicroPython: SPI(2) is VSPI on its native pins
     psram: false
+    # I2C touch for the capacitive SPI panels (tap series). Measured on the
+    # 1.28 inch bench rig, 2026-10-29: IT7259 on SDA 27 / SCL 21, no INT or RST.
+    touch_sda: 27
+    touch_scl: 21
+    touch_int: -1
+    touch_rst: -1
 
 # ── Parallel wiring (square series) ──────────────────────────────────────────
 # The square panels are 8080 8-bit parallel with an I2C touch controller, on a
@@ -335,6 +347,283 @@ panels:
       than wide. Circles come out 2% oval, below what the eye notices. Colour,
       offsets, all four rotations and touch in all four rotations measured on
       the classic-ESP32 bench rig (bench wiring, not the proposed breakout).
+
+  # ── Tap series (small round capacitive-touch panels, SPI) ──────────────────
+  #
+  # Watch-sized glass with capacitive touch over I2C. Ordinary SPI panels on the
+  # standard breakout (`wiring`), plus the I2C touch pins from the same set.
+  # Named by the diagonal in hundredths of an inch; _ctp = capacitive touch.
+
+  - id: tap_128_ctp
+    product: true
+    name: '1.28 inch round, capacitive touch'
+    family: tap
+    driver: GC9A01
+    width: 240
+    height: 240
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: true           # MADCTL 0x08 at rotation 0, from the factory sketch
+    invert: true        # the factory sketch passes ips=true; Arduino_GFX ends init with INVON
+    spi_hz: 20000000    # the factory sketch ran 20 MHz
+    backlight_active_low: false
+    touch:
+      controller: IT7259
+      swap_xy: false    # the factory sketch uses the raw axes unflipped
+      flip_x: false
+      flip_y: false
+    notes: >-
+      Round 240 x 240 glass: the corners of the framebuffer are not visible.
+      Values from the factory sketch (TK0128F25K, IT7259 touch demo); colour,
+      inversion and touch orientation not yet re-measured through this library.
+      The IT7259 reports 8-bit coordinates, 0-239, at I2C address 0x46.
+
+  - id: tap_150_ctp
+    product: true
+    name: '1.5 inch, capacitive touch'
+    family: tap
+    driver: GC9306
+    width: 240
+    height: 320
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: true           # factory sketch MADCTL 0x48: BGR | MX
+    invert: false       # factory sketch sends INVOFF
+    spi_hz: 10000000    # the factory sketch's draw speed; it inits at 1 MHz on flying wires and says 40 MHz does not hold there
+    backlight_active_low: false   # UNVERIFIED - the factory sketch never drives a backlight pin
+    touch:
+      controller: CST816
+      swap_xy: false
+      flip_x: false
+      flip_y: false
+      # The touch layer is bigger than the picture: the vendor's four-target
+      # least-squares fit (disp_x = 0.8914 tx + 18.61, disp_y = 1.0636 ty + 29.28)
+      # as raw values at the screen's edges: x at left/right, y at top/bottom.
+      raw: [-21, 247, -28, 272]
+    notes: >-
+      Rounded-corner watch glass, 240 x 320 portrait. The datasheet file is named
+      GC9306 but the commands are the ST7789's (COLMOD 0x55). From the factory
+      sketch (FPC-1502401, CST816D at I2C 0x15); not yet re-run through this
+      library. The factory wiring is the standard ESP32-S3 set: RES 42, CS 10,
+      SCL 12, SDA 11, DC 2, touch SDA 4 / SCL 6 / RST 7 / INT 5.
+
+  - id: tap_196_ctp
+    product: true
+    name: '1.96 inch, capacitive touch'
+    family: tap
+    driver: GC9307
+    bus: par8
+    width: 240
+    height: 296         # the controller RAM is 240 x 320; the glass shows 296 rows
+    rotation: 0
+    offsets: [0, 0, 0, 24]   # rotation 0 verified on the factory sketch; the 24 for the two rotations that flip the row scan is a guess (320 - 296) - UNVERIFIED
+    bgr: true           # MADCTL 0x08, factory sketch
+    invert: false
+    backlight_active_low: false   # no backlight pin: the LEDs are wired to 3.3 V through a resistor, always on
+    par8:
+      data: [5, 6, 4, 7, 15, 1, 10, 11]   # D0..D7 - NOT in order; the FPC numbers them D7..D0
+      wr: 2
+      dc: 42
+      cs: 41
+      rd: -1            # the panel has no RD pin
+      rst: -1           # RES is tied to 3.3 V on the module: the driver sends a software reset
+      backlight: -1
+      touch_sda: 13
+      touch_scl: 12     # TP_RES tied to 3.3 V and TP_INT not connected: polled, no reset pin
+    touch:
+      controller: CST816
+      swap_xy: false    # UNVERIFIED - the factory sketch calibrates at every boot (5-point affine) instead of recording the result
+      flip_x: false
+      flip_y: false
+      raw: [0, 239, 0, 295]   # UNVERIFIED - the chip's native range, assumed to match the glass
+    notes: >-
+      Factory sketch: RQ196BA24019, GC9307 + CST816D, 8080 8-bit parallel, on its
+      own flying-wire pins (not the Tap breakout). The glass shows the picture
+      mirrored left-right and any MADCTL with MX blanks it, so the driver mirrors
+      in software (LB_TFT.cpp). The CST816D touch needs 4.7k pull-ups on SDA and
+      SCL. Not yet run through this library.
+
+  # ── RLCD series (reflective monochrome LCD, ST7305, SPI) ────────────────────
+  #
+  # Not e-paper: a frame goes out in a few milliseconds, nothing ghosts, there is
+  # no backlight (ambient light is the light) and the picture is gone with the
+  # power. The sketch draws in colour as on any panel; flush() thresholds to black
+  # and white. Standard breakout pins (S3: CS 10, DC 2, MOSI 11, SCLK 12, RST 42).
+  # The three OSPTEK glasses differ in voltages, RAM window and pixel packing:
+  # init_ops picks the table in LB_ST7305.cpp. A set bit is black on these, so
+  # invert is false (the Waveshare 400 x 300 below packs the other way).
+
+  - id: rlcd_213
+    product: true
+    name: '2.13 inch reflective LCD'
+    family: rlcd
+    driver: ST7305
+    width: 122
+    height: 250
+    rotation: 3         # ships landscape, 250 x 122 (rotation 1 shows it upside down on this glass)
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    spi_hz: 20000000    # the vendor sketch's rate; drop to 8-10 MHz on long jumper wires
+    backlight_active_low: false
+    init_ops: st7305_213
+    notes: >-
+      OSPTEK YDP213H001-V3, from the vendor's test sketch. 122 columns sit at RAM
+      column 10 of 132. Not yet run through this library.
+
+  - id: rlcd_290
+    product: true
+    name: '2.9 inch reflective LCD'
+    family: rlcd
+    driver: ST7305
+    width: 168
+    height: 384
+    rotation: 1         # ships landscape, 384 x 168 (rotation 3 shows it upside down on this glass)
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    spi_hz: 20000000    # the vendor sketch's rate; drop to 8-10 MHz on long jumper wires
+    backlight_active_low: false
+    init_ops: st7305_290
+    notes: >-
+      OSPTEK YDP290H001/H004-V3, from the vendor's test sketch. 168 columns fill
+      the RAM window with no offset. Not yet run through this library.
+
+  - id: rlcd_420
+    product: true
+    name: '4.2 inch reflective LCD'
+    family: rlcd
+    driver: ST7305
+    width: 400
+    height: 300         # the glass is 300 x 400 natively; used landscape, as the vendor sketch does
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    spi_hz: 20000000    # the vendor sketch's rate; drop to 8-10 MHz on long jumper wires
+    backlight_active_low: false
+    init_ops: st7305_420
+    notes: >-
+      OSPTEK YDP420HT004-V3, from the vendor's test sketch (higher drive voltages than
+      the Waveshare module below, which is the same glass size). Needs PSRAM for the
+      240 KB canvas. UNVERIFIED: no unit on hand yet.
+
+  # ── Square LCD series, small SPI sizes (no touch) ──────────────────────────
+  #
+  # Same family as the 3.92 inch above, but these are ordinary SPI panels on the
+  # standard 15-pin breakout, so they take the normal `wiring` set. Named by the
+  # diagonal in hundredths of an inch; no touch, so no _ctp / _rtp suffix.
+
+  - id: square_085
+    product: true
+    name: '0.85 inch square'
+    family: square-lcd
+    driver: ST7735
+    width: 128
+    height: 128
+    rotation: 0
+    offsets: [2, 3, 2, 1]   # Arduino_GFX's 128x128 "green tab" values: 2+128+2 = 3+128+1 = 132, the GRAM is 132x132
+    bgr: true           # UNVERIFIED - from the factory test sketch; SquareCheck is how to confirm
+    invert: true        # blue came out yellow with false, 2026-10-28
+    spi_hz: 20000000    # UNVERIFIED - the factory sketch ran 20 MHz
+    backlight_active_low: true    # UNVERIFIED - the factory sketch drove BL low = on
+    notes: >-
+      Values taken from the factory test sketch (TFT_0_85_ST7735_Test), not yet
+      measured through this library. Check with examples/SquareCheck: labelled
+      red / green / blue pages, four edge bars for the offsets, backlight sweep.
+
+  - id: square_133
+    product: true
+    name: '1.33 inch square'
+    family: square-lcd
+    driver: ST7789
+    width: 240
+    height: 240
+    rotation: 0
+    offsets: [0, 0, 0, 80]   # GRAM is 240x320: rotation 0 starts at row 0, the 180 degree one 320-240 = 80 rows in
+    bgr: false          # UNVERIFIED - factory sketch passed none
+    invert: true        # UNVERIFIED - factory sketch had IPS = true
+    spi_hz: 20000000    # UNVERIFIED - the factory sketch ran 20 MHz
+    backlight_active_low: true    # UNVERIFIED - the factory sketch drove BL low = on
+    notes: >-
+      Values from the factory test sketch (TFT_1_33_ST7789_Test), not yet measured
+      through this library. CS is on GPIO 10 like the rest of the range.
+      Blank in SPI mode 0, works in mode 3 (what the library now uses for every
+      ST7789): confirmed on a real panel 2026-10-28.
+
+  - id: square_154
+    product: true
+    name: '1.54 inch square'
+    family: square-lcd
+    driver: ST7789
+    width: 240
+    height: 240
+    rotation: 0
+    offsets: [0, 0, 0, 80]   # GRAM is 240x320: rotation 0 starts at row 0, the 180 degree one 320-240 = 80 rows in
+    bgr: false          # UNVERIFIED - factory sketch passed none
+    invert: true        # UNVERIFIED - factory sketch had IPS = true
+    spi_hz: 20000000    # UNVERIFIED - the factory sketch ran 20 MHz
+    backlight_active_low: true    # UNVERIFIED - the factory sketch drove BL low = on
+    notes: >-
+      Values from the factory test sketch (TFT_1_54_ST7789_Test), not yet measured
+      through this library. That sketch is identical to the 1.33 inch one.
+      Blank in SPI mode 0, works in mode 3 (what the library now uses for every
+      ST7789): confirmed on a real panel 2026-10-28.
+
+  - id: square_200
+    product: true
+    name: '2.0 inch square'
+    family: square-lcd
+    driver: ILI9342
+    width: 320          # native landscape: ILI9342C is 320 x 240 at rotation 0
+    height: 240
+    rotation: 2         # upside down at 0 on the glass; 2 is upright (2026-10-28)
+    offsets: [0, 0, 0, 0]
+    bgr: true           # UNVERIFIED - from the factory test sketch
+    invert: true        # colours were inverted with false, 2026-10-28
+    spi_hz: 40000000    # UNVERIFIED - the factory sketch ran 40 MHz
+    backlight_active_low: true    # UNVERIFIED - the factory sketch drove BL low = on
+    notes: >-
+      Values and rotation table from the factory test sketch (TFT_2_0_ILI9342_Test),
+      which drove it as an ILI9341 with its own MADCTL table. Not yet measured
+      through this library. The 2.31 inch uses the same controller.
+
+  - id: square_231
+    product: true
+    name: '2.31 inch square'
+    family: square-lcd
+    driver: ILI9342
+    width: 320
+    height: 240
+    rotation: 2         # same glass orientation as the 2.0 inch: upright at 2
+    offsets: [0, 0, 0, 0]
+    bgr: true           # UNVERIFIED - from the factory test sketch
+    invert: false       # colours were wrong with true, 2026-10-28 (the 2.0 inch needs true)
+    spi_hz: 40000000    # UNVERIFIED - the factory sketch ran 40 MHz
+    backlight_active_low: true    # UNVERIFIED - the factory sketch drove BL low = on
+    notes: >-
+      The factory sketch (TFT_2_31_ILI9342_Test) is the 2.0 inch one with a
+      different label. Rotation is carried over from the 2.0 inch. Unlike the 2.0 inch it
+      is NOT inverted: that was measured on this panel.
+
+  - id: square_392
+    product: true
+    name: '3.92 inch square'
+    family: square-lcd
+    driver: ST7796
+    width: 320
+    height: 320
+    rotation: 0
+    offsets: [0, 0, 0, 160]   # GRAM is 320x480: rotation 0 starts at row 0, the 180 degree one 480-320 = 160 rows in
+    bgr: true           # UNVERIFIED - from the factory test sketch
+    invert: true        # UNVERIFIED - the factory sketch had INVERT_DISPLAY = 1
+    spi_hz: 40000000    # UNVERIFIED - the factory sketch ran 40 MHz
+    backlight_active_low: false   # UNVERIFIED - the factory sketch drove BL high = on
+    notes: >-
+      The SPI 3.92 inch, no touch (the 8-bit parallel one with GT911 is
+      square_392_ctp). Values from the factory test sketch (TFT_3_92_ST7796_Test),
+      which used its own init and its own MADCTL table; this entry runs the
+      library's ST7796 init and rotation table, so orientation needs checking.
 
   # ── Third-party boards ─────────────────────────────────────────────────────
   #

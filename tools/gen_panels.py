@@ -41,11 +41,12 @@ BANNER = "GENERATED FROM panels.yaml BY tools/gen_panels.py — DO NOT EDIT"
 LLMS_BEGIN = "<!-- BEGIN GENERATED PANEL TABLE — panels.yaml via tools/gen_panels.py -->"
 LLMS_END = "<!-- END GENERATED PANEL TABLE -->"
 
-DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341", "ILI9488", "RGB", "ILI9327", "ILI9486", "ST7305"]  # append only: values are baked into sketches
-INIT_OPS = {None: "LB_INIT_NONE", "nv3007_279": "LB_INIT_NV3007_279"}
+DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341", "ILI9488", "RGB", "ILI9327", "ILI9486", "ST7305", "ILI9342", "GC9A01", "GC9306", "GC9307"]  # append only: values are baked into sketches
+INIT_OPS = {None: "LB_INIT_NONE", "nv3007_279": "LB_INIT_NV3007_279", "st7305_213": "LB_INIT_ST7305_213",
+            "st7305_290": "LB_INIT_ST7305_290", "st7305_420": "LB_INIT_ST7305_420"}  # append only
 BUSES = {"spi": "LB_BUS_SPI", "par8": "LB_BUS_PAR8", "rgb": "LB_BUS_RGB"}
-TOUCH = ["NONE", "GT911", "XPT2046"]  # append only, like DRIVERS
-TOUCH_KIND = {"GT911": "capacitive", "XPT2046": "resistive"}
+TOUCH = ["NONE", "GT911", "XPT2046", "IT7259", "CST816"]  # append only, like DRIVERS
+TOUCH_KIND = {"GT911": "capacitive", "XPT2046": "resistive", "IT7259": "capacitive", "CST816": "capacitive"}
 
 
 def bus_of(panel) -> str:
@@ -109,7 +110,7 @@ def gen_header(doc) -> str:
         "",
         "// Panels whose controller needs a vendor init table that differs from the",
         "// driver's built-in default (same silicon, different voltage/gamma).",
-        "enum LB_InitOps : uint8_t { LB_INIT_NONE, LB_INIT_NV3007_279 };",
+        "enum LB_InitOps : uint8_t { LB_INIT_NONE, LB_INIT_NV3007_279, LB_INIT_ST7305_213, LB_INIT_ST7305_290, LB_INIT_ST7305_420 };",
         "",
         "// Which wiring set the panel uses: LB_WIRING (SPI) or LB_WIRING_PAR8.",
         "enum LB_Bus : uint8_t { LB_BUS_SPI, LB_BUS_PAR8, LB_BUS_RGB };",
@@ -133,6 +134,7 @@ def gen_header(doc) -> str:
         "struct LB_Par8Board {",
         "  int8_t data[8];   // D0..D7",
         "  int8_t wr, dc, rd, cs, rst, backlight;",
+        "  int8_t touchSda, touchScl, touchInt, touchRst;   // I2C touch on the module; -1 = not wired",
         "};",
         "",
         "// A loose SPI module: its own pins. The SPI host is not here, it follows the MCU.",
@@ -208,7 +210,8 @@ def gen_header(doc) -> str:
         L.append(
             f"static const LB_Par8Board LB_PAR8_{p['id'].upper()} = {{ "
             f"{{{', '.join(map(str, b['data']))}}}, {b['wr']}, {b['dc']}, "
-            f"{b.get('rd', -1)}, {b.get('cs', -1)}, {b['rst']}, {b['backlight']} }};"
+            f"{b.get('rd', -1)}, {b.get('cs', -1)}, {b['rst']}, {b['backlight']}, "
+            f"{b.get('touch_sda', -1)}, {b.get('touch_scl', -1)}, {b.get('touch_int', -1)}, {b.get('touch_rst', -1)} }};"
         )
     L += [
         "",
@@ -288,20 +291,23 @@ def gen_wiring(doc) -> str:
         "  int8_t  cs, rst, dc, mosi, sclk, backlight, miso;",
         "  uint8_t spiHost;",
         "  bool    psram;",
+        "  int8_t  touchSda, touchScl, touchInt, touchRst;   // I2C touch on an SPI panel; -1 = not wired",
         "};",
         "",
         "#if defined(CONFIG_IDF_TARGET_ESP32S3)",
         f"  #define LB_WIRING_NAME \"ESP32-S3\"",
         "  static const LB_Wiring LB_WIRING = {"
         f" {s3['cs']}, {s3['rst']}, {s3['dc']}, {s3['mosi']}, {s3['sclk']},"
-        f" {s3['backlight']}, {s3['miso']}, {s3['spi_host']}, {cbool(s3['psram'])} }};",
+        f" {s3['backlight']}, {s3['miso']}, {s3['spi_host']}, {cbool(s3['psram'])},"
+        f" {s3['touch_sda']}, {s3['touch_scl']}, {s3['touch_int']}, {s3['touch_rst']} }};",
         "#else",
         f"  #define LB_WIRING_NAME \"ESP32\"",
         "  // GPIO 41/42 do not exist on a classic ESP32 and 6-11 are the flash bus,",
         "  // so the S3 pins above cannot be reused. These are the standard VSPI pins.",
         "  static const LB_Wiring LB_WIRING = {"
         f" {c['cs']}, {c['rst']}, {c['dc']}, {c['mosi']}, {c['sclk']},"
-        f" {c['backlight']}, {c['miso']}, {c['spi_host']}, {cbool(c['psram'])} }};",
+        f" {c['backlight']}, {c['miso']}, {c['spi_host']}, {cbool(c['psram'])},"
+        f" {c['touch_sda']}, {c['touch_scl']}, {c['touch_int']}, {c['touch_rst']} }};",
         "#endif",
         "",
     ]

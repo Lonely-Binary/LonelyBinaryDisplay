@@ -28,6 +28,10 @@ static const LB_Ctl kCtl[] = {
   /* ILI9327 */ { 150, true,  false },  // MCUFRIEND_kbv: SWRESET + 150 ms
   /* ILI9486 */ { 120, false, false },
   /* ST7305  */ { 50,  false, true  },  // never reached: LB_ST7305 drives it
+  /* ILI9342 */ { 150, false, false },  // ILI9341's reset timing
+  /* GC9A01  */ { 200, false, true  },  // upstream sends no SWRESET when there is no reset pin
+  /* GC9306  */ { 150, false, true  },  // the factory sketch: hardware reset only
+  /* GC9307  */ { 150, false, false },  // RES is tied high on the module: SWRESET, then 150 ms
 };
 
 static const uint8_t *initTable(const LB_PanelDef *p) {
@@ -35,7 +39,8 @@ static const uint8_t *initTable(const LB_PanelDef *p) {
     case LB_DRV_ST7735:  return LB_INITSEQ_ST7735;
     case LB_DRV_ST7789:  return LB_INITSEQ_ST7789;
     case LB_DRV_ST7796:  return LB_INITSEQ_ST7796;
-    case LB_DRV_ILI9341: return LB_INITSEQ_ILI9341;
+    case LB_DRV_ILI9341:
+    case LB_DRV_ILI9342: return LB_INITSEQ_ILI9341;  // register-compatible; only the scan direction differs
     // The 8-bit parallel ILI9488 driver - 16-bit colour. Over SPI the ILI9488
     // only takes 18-bit colour, which is a different init and a different
     // pixel format; that is not what this table is.
@@ -47,6 +52,9 @@ static const uint8_t *initTable(const LB_PanelDef *p) {
                                               : LB_INITSEQ_NV3007_168;
     case LB_DRV_ILI9327: return LB_INITSEQ_ILI9327;
     case LB_DRV_ILI9486: return LB_INITSEQ_ILI9486;
+    case LB_DRV_GC9A01:  return LB_INITSEQ_GC9A01;
+    case LB_DRV_GC9306:  return LB_INITSEQ_GC9306;
+    case LB_DRV_GC9307:  return LB_INITSEQ_GC9307;
     case LB_DRV_RGB:
     case LB_DRV_ST7305:
       break;  // no controller, so no init table: LB_RgbScreen drives these
@@ -78,17 +86,40 @@ static uint8_t lb_madctl(LB_Driver drv, uint8_t r, bool bgr) {
       case 3:  bits = MY | MX | MV | ML;  break;
       default: bits = MX;                 break;
     }
+  } else if (drv == LB_DRV_GC9307) {
+    // Any MADCTL with MX set blanks this panel, and its glass shows rotation 0
+    // mirrored left-right. So no mapping here uses MX: the mirror is undone in
+    // software where it cannot be avoided (see LB_TFT::setRotation), and the
+    // rest are the ST7789 mapping with MX toggled. Only rotation 0 has been
+    // run on the glass.
+    switch (r & 3) {
+      case 1:  bits = MV;      break;
+      case 2:  bits = MY;      break;
+      case 3:  bits = MY | MV; break;
+      default: bits = 0;       break;
+    }
+  } else if (drv == LB_DRV_ILI9342) {
+    // ILI9342C is a 320 x 240 landscape-native part: rotation 0 needs no MX/MY
+    // at all. From the factory test sketch.
+    switch (r & 3) {
+      case 1:  bits = MV | MY; break;
+      case 2:  bits = MX | MY; break;
+      case 3:  bits = MV | MX; break;
+      default: bits = 0;       break;
+    }
   } else if (drv == LB_DRV_ILI9341 || drv == LB_DRV_ILI9488 ||
-             drv == LB_DRV_ILI9486) {
+             drv == LB_DRV_ILI9486 || drv == LB_DRV_GC9306) {
     // A third mapping again — ILI9341 agrees with neither family above.
-    // ILI9488 uses the same one.
+    // ILI9488 uses the same one. So does the GC9306: its commands are the
+    // ST7789's, but its glass is mirrored in X, which is exactly the ST7789
+    // mapping with MX flipped (the factory sketch's MADCTL 0x48 = BGR | MX).
     switch (r & 3) {
       case 1:  bits = MV;           break;
       case 2:  bits = MY;           break;
       case 3:  bits = MX | MY | MV; break;
       default: bits = MX;           break;
     }
-  } else {  // ST7789 / ST7796 / NV3007 share one mapping
+  } else {  // ST7789 / ST7796 / NV3007 / GC9A01 share one mapping
     switch (r & 3) {
       case 1:  bits = MX | MV; break;
       case 2:  bits = MX | MY; break;
@@ -172,6 +203,11 @@ void LB_TFT::setRotation(uint8_t r) {
     default: _xStart = p->colOff1; _yStart = p->rowOff1; break;
   }
   _curX = _curY = _curW = _curH = 0xFFFF;
+  // GC9307: the glass is mirrored along its own X, and MX is not usable. The
+  // mapping in lb_madctl() leaves that mirror in rotations 0 and 3 - along the
+  // picture's X at 0, along its Y at 3 - and these undo it as the pixels go out.
+  _mirrorX = p->driver == LB_DRV_GC9307 && _rotation == 0;
+  _mirrorY = p->driver == LB_DRV_GC9307 && _rotation == 3;
   writeMadctl();
 }
 
@@ -212,6 +248,8 @@ void LB_TFT::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color
   if (x + w > _w) w = _w - x;
   if (y + h > _h) h = _h - y;
   if (w <= 0 || h <= 0) return;
+  if (_mirrorX) x = _w - x - w;   // a solid block is the same mirrored: only its place changes
+  if (_mirrorY) y = _h - y - h;
   _bus->beginWrite();
   window(x, y, w, h);
   _bus->repeat(color, (uint32_t)w * h);
@@ -227,6 +265,27 @@ void LB_TFT::pushImage(int16_t x, int16_t y, int16_t w, int16_t h,
   if (x + cw > _w) cw = _w - x;
   if (y + ch > _h) ch = _h - y;
   if (cw <= 0 || ch <= 0) return;
+  if (_mirrorX || _mirrorY) {
+    // Undo the glass's mirror: move the window across the screen, then send the
+    // rows backwards (mirrorY) and/or each row back to front (mirrorX).
+    uint16_t row[320];
+    if (cw > 320) return;
+    if (_mirrorX) x = _w - x - cw;
+    if (_mirrorY) y = _h - y - ch;
+    _bus->beginWrite();
+    window(x, y, cw, ch);
+    for (int16_t i = 0; i < ch; i++) {
+      const uint16_t *src = px + (size_t)(sy + (_mirrorY ? ch - 1 - i : i)) * w + sx;
+      if (_mirrorX) {
+        for (int16_t k = 0; k < cw; k++) row[k] = src[cw - 1 - k];
+        _bus->pixels(row, cw);
+      } else {
+        _bus->pixels(src, cw);
+      }
+    }
+    _bus->endWrite();
+    return;
+  }
   _bus->beginWrite();
   window(x, y, cw, ch);
   if (cw == w) {
@@ -268,7 +327,7 @@ bool LB_TFTSpiBus::begin(int32_t hz) {
 // shared (an SD card on the same pins is common), and the transaction is what
 // holds the others off. See the note on the class for why not SPIClass's.
 void LB_TFTSpiBus::beginWrite() {
-  spiTransaction(_bus, _div, SPI_MODE0, SPI_MSBFIRST);
+  spiTransaction(_bus, _div, _mode, SPI_MSBFIRST);
   if (_cs >= 0) gpio_set_level((gpio_num_t)_cs, 0);
 }
 

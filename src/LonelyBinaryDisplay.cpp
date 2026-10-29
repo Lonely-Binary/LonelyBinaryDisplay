@@ -63,6 +63,10 @@ bool LB_Display::begin(bool useCanvas) {
                             _wiring.spiHost, _wiring.miso);
     // ILI9486 and ILI9488 take 18-bit colour only over SPI.
     if (_panel->driver == LB_DRV_ILI9486) static_cast<LB_TFTSpiBus *>(_bus)->setPixel18(true);
+    // Arduino_GFX opens the ST7789 in SPI mode 3 on ESP32. Some modules tie CS
+    // low, and there the idle-high clock of mode 3 is what the chip needs to
+    // stay in step; mode 0 left two such panels blank.
+    if (_panel->driver == LB_DRV_ST7789) static_cast<LB_TFTSpiBus *>(_bus)->setMode(SPI_MODE3);
     // ST7305 is 1 bit per pixel in a layout of its own, so it has its own driver.
     if (_panel->driver == LB_DRV_ST7305)
       _tft = new LB_ST7305(_bus, _panel, _wiring.rst);
@@ -131,6 +135,11 @@ void LB_Display::touchBegin() {
     const LB_RgbBoard *b = _panel->rgb;
     pins = {b->touchSda, b->touchScl, b->touchInt, b->touchRst,
             b->touchSck, b->touchMiso, b->touchMosi, b->touchCs};
+  } else if (_panel->bus == LB_BUS_SPI && !_panel->spi) {
+    // A capacitive SPI panel on the standard breakout: its I2C pins are part of
+    // the MCU's wiring set, like the display's.
+    pins = {_wiring.touchSda, _wiring.touchScl, _wiring.touchInt, _wiring.touchRst,
+            -1, -1, -1, -1};
   } else if (_panel->spi) {
     // Resistive touch on the display's own SPI bus: same SCLK/MISO/MOSI, its
     // own CS and IRQ, and the display's SPIClass rather than a second claim on
@@ -144,7 +153,7 @@ void LB_Display::touchBegin() {
   }
   _touch = LB_Touch::create(_panel->touch, pins);
   if (!_touch) {
-    static const char *kHeader[] = {"", "LB_TouchGT911.h", "LB_TouchXPT2046.h"};
+    static const char *kHeader[] = {"", "LB_TouchGT911.h", "LB_TouchXPT2046.h", "LB_TouchIT7259.h", "LB_TouchCST816.h"};
     Serial.printf("[LB_Display] this panel has touch - #include <%s> to use it. "
                   "The display works without.\n", kHeader[_panel->touch]);
     return;
@@ -241,7 +250,7 @@ void LB_Display::backlight(uint8_t level) {
 
 void LB_Display::printInfo(Print &out) const {
   static const char *kDrivers[] = {"ST7735", "ST7789", "ST7796", "NV3007",
-                                   "ILI9341", "ILI9488", "RGB (no controller)", "ILI9327", "ILI9486", "ST7305"};
+                                   "ILI9341", "ILI9488", "RGB (no controller)", "ILI9327", "ILI9486", "ST7305", "ILI9342", "GC9A01", "GC9306", "GC9307"};
   out.println(F("---- Lonely Binary Display ----"));
   out.printf("Panel      : %s (%s)\n", _panel->name, _panel->id);
   out.printf("Driver IC  : %s\n", kDrivers[_panel->driver]);
@@ -276,7 +285,7 @@ void LB_Display::printInfo(Print &out) const {
                _wiring.mosi, _wiring.sclk, _wiring.backlight);
   }
   if (_panel->touch != LB_TOUCH_NONE) {
-    static const char *kTouch[] = {"none", "GT911 (capacitive)", "XPT2046 (resistive)"};
+    static const char *kTouch[] = {"none", "GT911 (capacitive)", "XPT2046 (resistive)", "IT7259 (capacitive)", "CST816 (capacitive)"};
     out.printf("Touch      : %s %s\n", kTouch[_panel->touch], _touch ? "(running)" : "(not started)");
   }
   out.printf("Colour     : %s%s, %sinverted%s\n",

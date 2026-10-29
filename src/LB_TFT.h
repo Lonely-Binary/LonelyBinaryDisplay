@@ -79,6 +79,8 @@ public:
   /* Controllers that only take 18-bit colour over SPI (ILI9486, ILI9488): every
    * RGB565 pixel goes out as three bytes. */
   void setPixel18(bool on) { _px18 = on; }
+  /* SPI clock polarity/phase (0-3). Default 0; Arduino_GFX ran the ST7789 in 3. */
+  void setMode(uint8_t m) { _mode = m; }
   /* The bus itself, so a touch controller on the same pins shares it instead of
    * claiming the pins a second time (which would unplug the display). */
   class SPIClass *spi() const { return _spi; }
@@ -87,6 +89,7 @@ private:
   int8_t _dc, _cs, _sclk, _mosi, _miso;
   uint8_t _host;
   bool _px18 = false;
+  uint8_t _mode = 0;                  /* SPI_MODE0..3 */
   uint32_t _div = 0;                  /* clock divider, computed once */
   class SPIClass *_spi = nullptr;
   struct spi_struct_t *_bus = nullptr; /* the HAL handle behind _spi */
@@ -127,6 +130,10 @@ public:
   virtual bool scanStats(uint32_t *frames, uint32_t *off, uint32_t *maxUs) { (void)frames; (void)off; (void)maxUs; return false; }
   virtual uint16_t *framebuffer2() const { return nullptr; }
   virtual void present(const uint16_t *fb) { flushFramebuffer(fb); }
+
+  /* The reflective LCD's low-power mode: a few microamps and a slower refresh.
+   * Nothing to do on any other panel. */
+  virtual void setLowPower(bool low) { (void)low; }
 };
 
 class LB_TFT : public LB_Screen
@@ -158,6 +165,7 @@ private:
   int8_t _rst;
   bool _bgr = false;
   uint8_t _rotation = 0;
+  bool _mirrorX = false, _mirrorY = false;   /* software mirror, see setRotation() */
   int16_t _w = 0, _h = 0;
   int16_t _xStart = 0, _yStart = 0;
   /* Last window sent. 0xFFFF never matches, so the next window goes out in
