@@ -111,6 +111,18 @@ hand.
 | 2.25 inch | `LB_NARROW_225` | `NARROW_225` | 284 x 76 | ST7789 | SPI 8 MHz | — | active low |
 | 2.79 inch | `LB_NARROW_279` | `NARROW_279` | 428 x 142 | NV3007 | SPI 20 MHz | — | active low |
 | 3.92 inch square, capacitive touch | `LB_SQUARE_392_CTP` | not supported | 320 x 320 | ILI9488 | 8-bit parallel | GT911 (capacitive) | active high |
+| 1.28 inch round, capacitive touch | `LB_TAP_128_CTP` | not supported | 240 x 240 | GC9A01 | SPI 20 MHz | IT7259 (capacitive) | active high |
+| 1.5 inch, capacitive touch | `LB_TAP_150_CTP` | not supported | 240 x 320 | GC9306 | SPI 10 MHz | CST816 (capacitive) | active high |
+| 1.96 inch, capacitive touch | `LB_TAP_196_CTP` | not supported | 240 x 296 | GC9307 | 8-bit parallel | CST816 (capacitive) | active high |
+| 2.13 inch reflective LCD | `LB_RLCD_213` | not supported | 250 x 122 | ST7305 | SPI 20 MHz | — | active high |
+| 2.9 inch reflective LCD | `LB_RLCD_290` | not supported | 384 x 168 | ST7305 | SPI 20 MHz | — | active high |
+| 4.2 inch reflective LCD | `LB_RLCD_420` | not supported | 400 x 300 | ST7305 | SPI 20 MHz | — | active high |
+| 0.85 inch square | `LB_SQUARE_085` | `SQUARE_085` | 128 x 128 | ST7735 | SPI 20 MHz | — | active low |
+| 1.33 inch square | `LB_SQUARE_133` | `SQUARE_133` | 240 x 240 | ST7789 | SPI 20 MHz | — | active low |
+| 1.54 inch square | `LB_SQUARE_154` | `SQUARE_154` | 240 x 240 | ST7789 | SPI 20 MHz | — | active low |
+| 2.0 inch square | `LB_SQUARE_200` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
+| 2.31 inch square | `LB_SQUARE_231` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
+| 3.92 inch square | `LB_SQUARE_392` | `SQUARE_392` | 320 x 320 | ST7796 | SPI 40 MHz | — | active high |
 
 **Screen size is the size after the panel's default rotation**, which is
 what `width()` / `height()` return and what you should lay a UI out
@@ -122,6 +134,8 @@ transpose of the raw glass:
 - `LB_NARROW_19` — glass is 170 x 320, ships at rotation 1, so you get 320 x 170
 - `LB_NARROW_225` — glass is 76 x 284, ships at rotation 1, so you get 284 x 76
 - `LB_NARROW_279` — glass is 142 x 428, ships at rotation 1, so you get 428 x 142
+- `LB_RLCD_213` — glass is 122 x 250, ships at rotation 3, so you get 250 x 122
+- `LB_RLCD_290` — glass is 168 x 384, ships at rotation 1, so you get 384 x 168
 - `LB_ILI9327_400X240` — glass is 240 x 400, ships at rotation 1, so you get 400 x 240
 - `LB_ILI9486_480X320` — glass is 320 x 480, ships at rotation 3, so you get 480 x 320
 - `LB_ILI9341_320X240` — glass is 240 x 320, ships at rotation 1, so you get 320 x 240
@@ -209,7 +223,7 @@ drawGauge(display, 42.0f);
 | `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. With a framebuffer only 0 ↔ 2 and 1 ↔ 3 are allowed. |
 | `rotation()`, `width()`, `height()` | Current state, rotation included. |
 | `setWiring(pins)` | Your own GPIOs. **Before `begin()`.** Takes `LB_Wiring` (SPI panels) or `LB_WiringPar8` (the square series, 8-bit parallel); start from `LB_WIRING` / `LB_WIRING_PAR8` and change only what differs. |
-| `touch()` | The touch controller of a `_CTP` / `_RTP` panel, or `nullptr`. Needs `#include <LB_TouchGT911.h>` in the sketch (the LVGL library includes it itself). `touch()->getTouch(&x, &y)` returns `true` while a finger is down, in screen coordinates that follow `setRotation()`. `touch()->read(points, max)` gives every finger. |
+| `touch()` | The touch controller of a `_CTP` / `_RTP` panel, or `nullptr`. Needs `#include <LB_TouchGT911.h>` in the sketch (`<LB_TouchCST816.h>` for `LB_TAP_150_CTP`, `<LB_TouchIT7259.h>` for `LB_TAP_128_CTP`, which also has `takeGesture()` for tap / double tap / flick) (the LVGL library includes it itself). `touch()->getTouch(&x, &y)` returns `true` while a finger is down, in screen coordinates that follow `setRotation()`. `touch()->read(points, max)` gives every finger. |
 | `setSpiHz(hz)` | Override the panel's SPI clock. **Before `begin()`**; `0` restores the default. |
 | `setColorOrder(order)` | `LB_Display::COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time, before or after `begin()`. |
 | `setInverted(bool)` | Set the panel's inversion. Any time, before or after `begin()`. |

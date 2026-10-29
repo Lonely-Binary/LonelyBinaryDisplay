@@ -265,6 +265,22 @@ touch.setRotation(0);   // same value as display.setRotation()
 | `setRotation(0..3)` | Keep it in step with the display, and the points follow the picture. |
 | `setOrientation(swapXY, flipX, flipY)` | How the touch layer sits relative to display rotation 0. The panel table carries this; only for a panel it does not know. |
 
+The 1.28" round Tap panel (`LB_TAP_128_CTP`) uses the IT7259 instead:
+`#include <LB_TouchIT7259.h>`, one finger, 0-239 in both axes, plus the chip's own
+gestures through `takeGesture()` (tap, double tap, flick). Its I2C pins are part
+of the wiring set (classic ESP32: SDA 27, SCL 21; ESP32-S3: SDA 4, SCL 6, INT 5, RST 7); see `examples/TapOrb`.
+
+The 1.5" Tap panel (`LB_TAP_150_CTP`, 240 x 320) uses the CST816D:
+`#include <LB_TouchCST816.h>`, one finger, mapped to pixels with the raw edge
+values in the panel table. The driver never writes to the chip (the vendor found
+that stops it scanning). Try it with `examples/TapCheck`.
+
+The 1.96" Tap panel (`LB_TAP_196_CTP`, 240 x 296, GC9307, 8-bit parallel) also uses the
+CST816D. It is wired on its own pins, not the breakout: D0-D7 on GPIO 5, 6, 4, 7,
+15, 1, 10, 11 (the FPC numbers them D7..D0), WR 2, DC 42, CS 41, touch SDA 13 /
+SCL 12, and no reset, backlight or interrupt pins. Not yet run through this
+library; `examples/TapCheck` is the first thing to try.
+
 Measured on the 3.92" square (`LB_SQUARE_392_CTP`), classic ESP32, SDA 21
 SCL 22 INT 18 RST 19: the GT911 reports 320 x 320 in the same orientation as
 display rotation 0. All four rotations were checked on hardware, 5/5 targets

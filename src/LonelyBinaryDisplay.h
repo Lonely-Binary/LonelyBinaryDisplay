@@ -75,8 +75,8 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
       _wiringPar8.wr = b.wr; _wiringPar8.dc = b.dc; _wiringPar8.rst = b.rst;
       _wiringPar8.backlight = b.backlight;
       _wiringPar8.cs = b.cs; _wiringPar8.rd = b.rd;
-      _wiringPar8.touchSda = _wiringPar8.touchScl = -1;
-      _wiringPar8.touchInt = _wiringPar8.touchRst = -1;
+      _wiringPar8.touchSda = b.touchSda; _wiringPar8.touchScl = b.touchScl;
+      _wiringPar8.touchInt = b.touchInt; _wiringPar8.touchRst = b.touchRst;
     }
   }
 
@@ -179,6 +179,12 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
 
   // True once begin() has brought the panel up.
   bool begun() const { return _tft != nullptr; }
+
+  // Reflective LCD (RLCD) only: true drops the panel to its low-power refresh
+  // (about 8 Hz, a few microamps), false returns to the fast one. Frames can be
+  // sent in either; they just show up more slowly in the low one. A no-op on
+  // every other panel.
+  void lowPower(bool low) { if (_tft) _tft->setLowPower(low); }
 
   // Push a w x h block of RGB565 pixels (as the CPU holds them, row-major).
   // Clipped to the screen. With a framebuffer this copies into it and shows on
