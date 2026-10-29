@@ -508,6 +508,113 @@ panels:
       the Waveshare module below, which is the same glass size). Needs PSRAM for the
       240 KB canvas. UNVERIFIED: no unit on hand yet.
 
+  # ── RTP series (resistive touch, SPI) ──────────────────────────────────────
+  #
+  # Ordinary SPI TFT panels with a 4-wire resistive touch layer read by an NS2009
+  # (a TSC2007-compatible controller) over I2C. Named by the diagonal in hundredths
+  # of an inch. A resistive layer needs a firm press (a nail or stylus), and its
+  # raw readings are not pixels: raw holds the reading at the screen's edges
+  # (left, right, top, bottom). The values here are rough starting points; the
+  # RtpCheck example runs a 5-point calibration and prints the real ones.
+
+  - id: rtp_180
+    product: true
+    name: '1.8 inch, resistive touch'
+    family: rtp
+    driver: ST7735
+    width: 128
+    height: 160
+    rotation: 1         # ships landscape, 160 x 128 (turned right 90 degrees)
+    offsets: [2, 1, 2, 1]   # the 132 x 162 RAM, glass at column 2, row 1 (red-tab modules)
+    bgr: false
+    invert: true        # a TN panel; with bgr false, from the vendor's test sketch
+    spi_hz: 20000000    # the vendor sketch ran 40 MHz after a 500 ms power-up wait; 20 here to be safe
+    backlight_active_low: true    # LOW lights it
+    touch:
+      controller: NS2009
+      swap_xy: true     # measured: this layer's raw X runs along the screen's Y
+      flip_x: false
+      flip_y: false
+      raw: [3824, 217, 185, 3717]   # measured 2026-10-29 with the RtpCheck 4-point calibration (worst error 1 px)
+    notes: >-
+      From the vendor's ST7735_18_Touch_Test sketch. Wait about 500 ms after power-up
+      before display.begin(), or the picture comes up scrambled. The touch chip is on
+      I2C (SDA 4, SCL 6, IRQ 5, address 0x48-0x4B found automatically).
+
+  - id: rtp_240
+    product: true
+    name: '2.4 inch, resistive touch'
+    family: rtp
+    driver: ST7789
+    width: 240
+    height: 320
+    rotation: 1         # ships landscape, 320 x 240 (turned right 90 degrees)
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false       # NOT inverted: with true, red comes out cyan (vendor sketch, LCD_IPS false)
+    spi_hz: 40000000
+    backlight_active_low: true    # LOW lights it
+    touch:
+      controller: NS2009
+      swap_xy: false
+      flip_x: false
+      flip_y: false
+      raw: [189, 3796, 169, 3720]   # measured 2026-10-29 with the RtpCheck 4-point calibration (worst error 2 px)
+    notes: >-
+      Module YT240L030, from the vendor's 2_4 sketch. Its CS pin is not wired to the
+      processor there (tied low), which the standard breakout's CS 10 does not
+      disturb. The touch chip is judged by pressure alone: PENIRQ is not routed on
+      this module.
+
+  - id: rtp_280
+    product: true
+    name: '2.8 inch, resistive touch'
+    family: rtp
+    driver: ST7789
+    width: 240
+    height: 320
+    rotation: 1         # ships landscape, 320 x 240, as the 1.8 and 2.4 do
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false       # NOT inverted: with true, red comes out cyan (vendor sketch, LCD_IPS false)
+    spi_hz: 40000000
+    backlight_active_low: true    # LOW lights it
+    touch:
+      controller: NS2009
+      swap_xy: false
+      flip_x: false
+      flip_y: false
+      raw: [321, 3786, 163, 3284]   # measured 2026-10-29 with the RtpCheck 4-point calibration
+    notes: >-
+      From the vendor's 2_8 sketch, which is the 2.4 inch one with the label changed:
+      the same ST7789 settings, wiring and NS2009 touch. CS is wired here (GPIO 10).
+      The touch chip is judged by pressure alone: PENIRQ is not routed on these modules.
+
+  - id: rtp_430
+    product: true
+    name: '4.3 inch, resistive touch'
+    family: rtp
+    driver: NV3041A
+    width: 480
+    height: 272
+    rotation: 0         # the glass is landscape
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    spi_hz: 20000000    # the vendor's rate; it notes 60-80 MHz may work once stable
+    backlight_active_low: true    # LOW lights it, like the other RTP panels; verified on the bench (0 % was brightest, 100 % dark with it false)
+    touch:
+      controller: NS2009
+      swap_xy: false
+      flip_x: false
+      flip_y: false
+      raw: [150, 3943, 3674, 194]   # measured 2026-10-29 with the RtpCheck 4-point calibration
+    notes: >-
+      HKC 0430K010-N2T7300, NV3041A-01, from the vendor's TFT43 sketch. The module
+      must be strapped for 4-wire SPI 8-bit: IM0 and SPI4W to IOVCC, IM1 to GND, RD up.
+      The vendor's rotation numbering has 0 and 2 swapped against the ST7789 family;
+      rotations 1-3 have not been looked at on the glass.
+
   # ── Square LCD series, small SPI sizes (no touch) ──────────────────────────
   #
   # Same family as the 3.92 inch above, but these are ordinary SPI panels on the

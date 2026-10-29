@@ -19,7 +19,10 @@
 */
 #include <LonelyBinaryDisplay.h>
 
-LB_Display display(LB_RLCD_213);   // or LB_RLCD_290, LB_RLCD_420, LB_ST7305_400X300
+LB_Display display(LB_RLCD_213);
+//LB_Display display(LB_RLCD_290);
+//LB_Display display(LB_RLCD_420);
+//LB_Display display(LB_ST7305_400X300);
 
 // Everything is sized from the screen: the 2.13 inch is only 122 pixels wide.
 static bool big() { return display.width() >= 300; }

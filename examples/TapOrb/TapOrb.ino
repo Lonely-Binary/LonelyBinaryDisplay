@@ -26,7 +26,9 @@
 // shows noise on your wiring, drop it back to 20000000.
 static const int32_t SPI_HZ = 40000000;
 
-LB_Display display(LB_TAP_196_CTP);   // or LB_TAP_128_CTP, LB_TAP_150_CTP
+LB_Display display(LB_TAP_196_CTP);
+//LB_Display display(LB_TAP_128_CTP);
+//LB_Display display(LB_TAP_150_CTP);
 
 static int CX, CY, R;           // the middle and the radius of the circle we draw in; set in setup()
 static const int TICKS = 60;

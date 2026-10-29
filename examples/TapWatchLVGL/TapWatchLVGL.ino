@@ -52,9 +52,9 @@ static const int32_t  SPI_HZ      = 40000000;   // SPI panels only (not the 1.96
 static const uint32_t IDLE_DIM_MS = 15000;      // dim after this long without a touch
 static const uint8_t  DIM_LEVEL   = 25;         // backlight while dimmed, 0-255
 
-// The panel: LB_TAP_128_CTP (1.28 inch round), LB_TAP_150_CTP (1.5 inch, 240 x 320)
-// or LB_TAP_196_CTP (1.96 inch, 240 x 296).
 LB_Display display(LB_TAP_196_CTP);
+//LB_Display display(LB_TAP_128_CTP);
+//LB_Display display(LB_TAP_150_CTP);
 
 static int W, H, D;     // screen size, and the smaller side (the dial's room); set in setup()
 

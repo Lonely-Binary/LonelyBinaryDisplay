@@ -41,12 +41,12 @@ BANNER = "GENERATED FROM panels.yaml BY tools/gen_panels.py — DO NOT EDIT"
 LLMS_BEGIN = "<!-- BEGIN GENERATED PANEL TABLE — panels.yaml via tools/gen_panels.py -->"
 LLMS_END = "<!-- END GENERATED PANEL TABLE -->"
 
-DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341", "ILI9488", "RGB", "ILI9327", "ILI9486", "ST7305", "ILI9342", "GC9A01", "GC9306", "GC9307"]  # append only: values are baked into sketches
+DRIVERS = ["ST7735", "ST7789", "ST7796", "NV3007", "ILI9341", "ILI9488", "RGB", "ILI9327", "ILI9486", "ST7305", "ILI9342", "GC9A01", "GC9306", "GC9307", "NV3041A"]  # append only: values are baked into sketches
 INIT_OPS = {None: "LB_INIT_NONE", "nv3007_279": "LB_INIT_NV3007_279", "st7305_213": "LB_INIT_ST7305_213",
             "st7305_290": "LB_INIT_ST7305_290", "st7305_420": "LB_INIT_ST7305_420"}  # append only
 BUSES = {"spi": "LB_BUS_SPI", "par8": "LB_BUS_PAR8", "rgb": "LB_BUS_RGB"}
-TOUCH = ["NONE", "GT911", "XPT2046", "IT7259", "CST816"]  # append only, like DRIVERS
-TOUCH_KIND = {"GT911": "capacitive", "XPT2046": "resistive", "IT7259": "capacitive", "CST816": "capacitive"}
+TOUCH = ["NONE", "GT911", "XPT2046", "IT7259", "CST816", "NS2009"]  # append only, like DRIVERS
+TOUCH_KIND = {"GT911": "capacitive", "XPT2046": "resistive", "IT7259": "capacitive", "CST816": "capacitive", "NS2009": "resistive"}
 
 
 def bus_of(panel) -> str:

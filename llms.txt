@@ -117,6 +117,10 @@ hand.
 | 2.13 inch reflective LCD | `LB_RLCD_213` | not supported | 250 x 122 | ST7305 | SPI 20 MHz | — | active high |
 | 2.9 inch reflective LCD | `LB_RLCD_290` | not supported | 384 x 168 | ST7305 | SPI 20 MHz | — | active high |
 | 4.2 inch reflective LCD | `LB_RLCD_420` | not supported | 400 x 300 | ST7305 | SPI 20 MHz | — | active high |
+| 1.8 inch, resistive touch | `LB_RTP_180` | `RTP_180` | 160 x 128 | ST7735 | SPI 20 MHz | NS2009 (resistive) | active low |
+| 2.4 inch, resistive touch | `LB_RTP_240` | `RTP_240` | 320 x 240 | ST7789 | SPI 40 MHz | NS2009 (resistive) | active low |
+| 2.8 inch, resistive touch | `LB_RTP_280` | `RTP_280` | 320 x 240 | ST7789 | SPI 40 MHz | NS2009 (resistive) | active low |
+| 4.3 inch, resistive touch | `LB_RTP_430` | not supported | 480 x 272 | NV3041A | SPI 20 MHz | NS2009 (resistive) | active low |
 | 0.85 inch square | `LB_SQUARE_085` | `SQUARE_085` | 128 x 128 | ST7735 | SPI 20 MHz | — | active low |
 | 1.33 inch square | `LB_SQUARE_133` | `SQUARE_133` | 240 x 240 | ST7789 | SPI 20 MHz | — | active low |
 | 1.54 inch square | `LB_SQUARE_154` | `SQUARE_154` | 240 x 240 | ST7789 | SPI 20 MHz | — | active low |
@@ -136,6 +140,9 @@ transpose of the raw glass:
 - `LB_NARROW_279` — glass is 142 x 428, ships at rotation 1, so you get 428 x 142
 - `LB_RLCD_213` — glass is 122 x 250, ships at rotation 3, so you get 250 x 122
 - `LB_RLCD_290` — glass is 168 x 384, ships at rotation 1, so you get 384 x 168
+- `LB_RTP_180` — glass is 128 x 160, ships at rotation 1, so you get 160 x 128
+- `LB_RTP_240` — glass is 240 x 320, ships at rotation 1, so you get 320 x 240
+- `LB_RTP_280` — glass is 240 x 320, ships at rotation 1, so you get 320 x 240
 - `LB_ILI9327_400X240` — glass is 240 x 400, ships at rotation 1, so you get 400 x 240
 - `LB_ILI9486_480X320` — glass is 320 x 480, ships at rotation 3, so you get 480 x 320
 - `LB_ILI9341_320X240` — glass is 240 x 320, ships at rotation 1, so you get 320 x 240
