@@ -22,7 +22,9 @@
 #include <LB_TouchCST816.h>
 #include <LB_TouchIT7259.h>
 
-LB_Display display(LB_TAP_196_CTP);   // or LB_TAP_128_CTP, LB_TAP_150_CTP
+LB_Display display(LB_TAP_196_CTP);
+//LB_Display display(LB_TAP_128_CTP);
+//LB_Display display(LB_TAP_150_CTP);
 
 static int BOX = 76;            // set in setup() from the screen size
 static const int MARGIN = 8;

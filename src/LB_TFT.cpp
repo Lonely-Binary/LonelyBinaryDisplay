@@ -32,6 +32,7 @@ static const LB_Ctl kCtl[] = {
   /* GC9A01  */ { 200, false, true  },  // upstream sends no SWRESET when there is no reset pin
   /* GC9306  */ { 150, false, true  },  // the factory sketch: hardware reset only
   /* GC9307  */ { 150, false, false },  // RES is tied high on the module: SWRESET, then 150 ms
+  /* NV3041A */ { 120, false, true  },  // the vendor sketch: hardware reset only
 };
 
 static const uint8_t *initTable(const LB_PanelDef *p) {
@@ -55,6 +56,7 @@ static const uint8_t *initTable(const LB_PanelDef *p) {
     case LB_DRV_GC9A01:  return LB_INITSEQ_GC9A01;
     case LB_DRV_GC9306:  return LB_INITSEQ_GC9306;
     case LB_DRV_GC9307:  return LB_INITSEQ_GC9307;
+    case LB_DRV_NV3041A: return LB_INITSEQ_NV3041A;
     case LB_DRV_RGB:
     case LB_DRV_ST7305:
       break;  // no controller, so no init table: LB_RgbScreen drives these
@@ -85,6 +87,16 @@ static uint8_t lb_madctl(LB_Driver drv, uint8_t r, bool bgr) {
       case 2:  bits = MY | ML;            break;
       case 3:  bits = MY | MX | MV | ML;  break;
       default: bits = MX;                 break;
+    }
+  } else if (drv == LB_DRV_NV3041A) {
+    // The vendor's four, in the order its sketch gives them: 0 is the 480 x 272
+    // landscape the glass is made for. Not the ST7789's turn of the rotation by
+    // 90 degrees at a time - 0 and 2 are swapped - so it is spelled out.
+    switch (r & 3) {
+      case 1:  bits = MX | MV; break;
+      case 2:  bits = 0;       break;
+      case 3:  bits = MY | MV; break;
+      default: bits = MX | MY; break;
     }
   } else if (drv == LB_DRV_GC9307) {
     // Any MADCTL with MX set blanks this panel, and its glass shows rotation 0
@@ -228,8 +240,11 @@ void LB_TFT::cmd16x2(uint8_t c, uint16_t a, uint16_t b) {
 // NV3007 caches the two together — change either and both go out — and that
 // difference is reproduced too; see the note at the top of LB_TFT.h.
 void LB_TFT::window(int16_t x, int16_t y, int16_t w, int16_t h) {
-  const bool xChanged = (uint16_t)x != _curX || (uint16_t)w != _curW;
-  const bool yChanged = (uint16_t)y != _curY || (uint16_t)h != _curH;
+  // NV3041A: the vendor's code sends the whole window before every RAM write, so
+  // that is what it gets - no skipping of an unchanged CASET or RASET.
+  const bool always = _panel->driver == LB_DRV_NV3041A;
+  const bool xChanged = always || (uint16_t)x != _curX || (uint16_t)w != _curW;
+  const bool yChanged = always || (uint16_t)y != _curY || (uint16_t)h != _curH;
   const bool both = _panel->driver == LB_DRV_NV3007 && (xChanged || yChanged);
   if (xChanged || both) {
     cmd16x2(0x2A, x + _xStart, x + w - 1 + _xStart);  // CASET

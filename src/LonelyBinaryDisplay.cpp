@@ -153,7 +153,7 @@ void LB_Display::touchBegin() {
   }
   _touch = LB_Touch::create(_panel->touch, pins);
   if (!_touch) {
-    static const char *kHeader[] = {"", "LB_TouchGT911.h", "LB_TouchXPT2046.h", "LB_TouchIT7259.h", "LB_TouchCST816.h"};
+    static const char *kHeader[] = {"", "LB_TouchGT911.h", "LB_TouchXPT2046.h", "LB_TouchIT7259.h", "LB_TouchCST816.h", "LB_TouchNS2009.h"};
     Serial.printf("[LB_Display] this panel has touch - #include <%s> to use it. "
                   "The display works without.\n", kHeader[_panel->touch]);
     return;
@@ -250,7 +250,7 @@ void LB_Display::backlight(uint8_t level) {
 
 void LB_Display::printInfo(Print &out) const {
   static const char *kDrivers[] = {"ST7735", "ST7789", "ST7796", "NV3007",
-                                   "ILI9341", "ILI9488", "RGB (no controller)", "ILI9327", "ILI9486", "ST7305", "ILI9342", "GC9A01", "GC9306", "GC9307"};
+                                   "ILI9341", "ILI9488", "RGB (no controller)", "ILI9327", "ILI9486", "ST7305", "ILI9342", "GC9A01", "GC9306", "GC9307", "NV3041A"};
   out.println(F("---- Lonely Binary Display ----"));
   out.printf("Panel      : %s (%s)\n", _panel->name, _panel->id);
   out.printf("Driver IC  : %s\n", kDrivers[_panel->driver]);
@@ -285,7 +285,7 @@ void LB_Display::printInfo(Print &out) const {
                _wiring.mosi, _wiring.sclk, _wiring.backlight);
   }
   if (_panel->touch != LB_TOUCH_NONE) {
-    static const char *kTouch[] = {"none", "GT911 (capacitive)", "XPT2046 (resistive)", "IT7259 (capacitive)", "CST816 (capacitive)"};
+    static const char *kTouch[] = {"none", "GT911 (capacitive)", "XPT2046 (resistive)", "IT7259 (capacitive)", "CST816 (capacitive)", "NS2009 (resistive)"};
     out.printf("Touch      : %s %s\n", kTouch[_panel->touch], _touch ? "(running)" : "(not started)");
   }
   out.printf("Colour     : %s%s, %sinverted%s\n",

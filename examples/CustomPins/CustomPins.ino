@@ -18,6 +18,11 @@
 #include <LonelyBinaryDisplay.h>
 
 LB_Display display(LB_TFT_24);
+//LB_Display display(LB_TFT_096);
+//LB_Display display(LB_TFT_18);
+//LB_Display display(LB_TFT_20);
+//LB_Display display(LB_TFT_28);
+//LB_Display display(LB_TFT_35);
 
 void setup() {
   Serial.begin(115200);

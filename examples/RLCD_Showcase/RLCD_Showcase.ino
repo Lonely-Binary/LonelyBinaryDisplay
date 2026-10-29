@@ -31,7 +31,9 @@
 #include <time.h>
 
 // Which panel this is for: 213, 290 or 420. It picks the panel and the video made for its size.
-#define RLCD_SIZE 290
+#define RLCD_SIZE 213
+//#define RLCD_SIZE 290
+//#define RLCD_SIZE 420
 
 #if RLCD_SIZE == 213
   #define RLCD_PANEL LB_RLCD_213
