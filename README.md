@@ -26,32 +26,53 @@ Arduino/C++ **and** MicroPython, from one shared panel table.
 
 ## Supported panels
 
-| Constant | Panel | Resolution | Driver | Backlight |
-|---|---|---|---|---|
-| `LB_TFT_096` | 0.96" | 80 × 160 | ST7735 | **active low** |
-| `LB_TFT_18` | 1.8" | 128 × 160 | ST7735 | active high |
-| `LB_TFT_20` | 2.0" | 240 × 320 | ST7789 | active high |
-| `LB_TFT_24` | 2.4" | 240 × 320 | ST7789 | active high |
-| `LB_TFT_28` | 2.8" | 240 × 320 | ST7789 | active high |
-| `LB_TFT_35` | 3.5" | 320 × 480 | ST7796 | active high |
-| `LB_NARROW_114` | 1.14" | 135 × 240 | ST7789 | active low |
-| `LB_NARROW_168` | 1.68" | 142 × 428 | NV3007 | active low |
-| `LB_NARROW_19` | 1.9" | 170 × 320 | ST7789 | active low |
-| `LB_NARROW_225` | 2.25" | 76 × 284 | ST7789 | active low |
-| `LB_NARROW_279` | 2.79" | 142 × 428 | NV3007 | active low |
+| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | Bus | Touch | Backlight |
+|---|---|---|---|---|---|---|---|
+| 0.96 inch | `LB_TFT_096` | `TFT_096` | 80 x 160 | ST7735 | SPI 20 MHz | — | active low |
+| 1.8 inch | `LB_TFT_18` | `TFT_18` | 128 x 160 | ST7735 | SPI 20 MHz | — | active high |
+| 2.0 inch | `LB_TFT_20` | `TFT_20` | 240 x 320 | ST7789 | SPI 40 MHz | — | active high |
+| 2.4 inch | `LB_TFT_24` | `TFT_24` | 240 x 320 | ST7789 | SPI 40 MHz | — | active high |
+| 2.8 inch | `LB_TFT_28` | `TFT_28` | 240 x 320 | ST7789 | SPI 40 MHz | — | active high |
+| 3.5 inch | `LB_TFT_35` | `TFT_35` | 320 x 480 | ST7796 | SPI 40 MHz | — | active high |
+| 1.14 inch | `LB_NARROW_114` | `NARROW_114` | 240 x 135 | ST7789 | SPI 8 MHz | — | active low |
+| 1.68 inch | `LB_NARROW_168` | `NARROW_168` | 428 x 142 | NV3007 | SPI 8 MHz | — | active low |
+| 1.9 inch | `LB_NARROW_19` | `NARROW_19` | 320 x 170 | ST7789 | SPI 8 MHz | — | active low |
+| 2.25 inch | `LB_NARROW_225` | `NARROW_225` | 284 x 76 | ST7789 | SPI 8 MHz | — | active low |
+| 2.79 inch | `LB_NARROW_279` | `NARROW_279` | 428 x 142 | NV3007 | SPI 20 MHz | — | active low |
+| 3.92 inch square, capacitive touch | `LB_SQUARE_392_CTP` | not supported | 320 x 320 | ILI9488 | 8-bit parallel | GT911 (capacitive) | active high |
+| 1.28 inch round, capacitive touch | `LB_TAP_128_CTP` | not supported | 240 x 240 | GC9A01 | SPI 20 MHz | IT7259 (capacitive) | active high |
+| 1.5 inch, capacitive touch | `LB_TAP_150_CTP` | not supported | 240 x 320 | GC9306 | SPI 10 MHz | CST816 (capacitive) | active high |
+| 1.96 inch, capacitive touch | `LB_TAP_196_CTP` | not supported | 240 x 296 | GC9307 | 8-bit parallel | CST816 (capacitive) | active high |
+| 2.13 inch reflective LCD | `LB_RLCD_213` | not supported | 250 x 122 | ST7305 | SPI 20 MHz | — | active high |
+| 2.9 inch reflective LCD | `LB_RLCD_290` | not supported | 384 x 168 | ST7305 | SPI 20 MHz | — | active high |
+| 4.2 inch reflective LCD | `LB_RLCD_420` | not supported | 400 x 300 | ST7305 | SPI 20 MHz | — | active high |
+| 1.8 inch, resistive touch | `LB_RTP_180` | `RTP_180` | 160 x 128 | ST7735 | SPI 20 MHz | NS2009 (resistive) | active low |
+| 2.4 inch, resistive touch | `LB_RTP_240` | `RTP_240` | 320 x 240 | ST7789 | SPI 40 MHz | NS2009 (resistive) | active low |
+| 2.8 inch, resistive touch | `LB_RTP_280` | `RTP_280` | 320 x 240 | ST7789 | SPI 40 MHz | NS2009 (resistive) | active low |
+| 4.3 inch, resistive touch | `LB_RTP_430` | not supported | 480 x 272 | NV3041A | SPI 20 MHz | NS2009 (resistive) | active low |
+| 0.85 inch square | `LB_SQUARE_085` | `SQUARE_085` | 128 x 128 | ST7735 | SPI 20 MHz | — | active low |
+| 1.33 inch square | `LB_SQUARE_133` | `SQUARE_133` | 240 x 240 | ST7789 | SPI 20 MHz | — | active low |
+| 1.54 inch square | `LB_SQUARE_154` | `SQUARE_154` | 240 x 240 | ST7789 | SPI 20 MHz | — | active low |
+| 2.0 inch square | `LB_SQUARE_200` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
+| 2.31 inch square | `LB_SQUARE_231` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
+| 3.92 inch square | `LB_SQUARE_392` | `SQUARE_392` | 320 x 320 | ST7796 | SPI 40 MHz | — | active high |
 
 ### Third-party screens
 
 Not products — screens other people sell, which the library can drive. They are
 named by controller and the size the sketch sees, so they cannot be mistaken
-for the table above. Each carries its own pins (classic ESP32); override them
-with `setWiring()`.
+for the table above. Each carries its own pins; override them with `setWiring()`.
 
-| Constant | Resolution | Driver | Bus | Backlight |
-|---|---|---|---|---|
-| `LB_ILI9327_400X240` | 400 × 240 | ILI9327 | 8-bit parallel | active high |
-| `LB_ILI9486_480X320` | 480 × 320 | ILI9486 | SPI, 18-bit colour | active high |
-| `LB_ILI9341_320X240` | 320 × 240 | ILI9341 | SPI | active high |
+| Panel | Arduino constant | MicroPython name | Screen size | Driver IC | Bus | Touch | Backlight |
+|---|---|---|---|---|---|---|---|
+| RGB | `LB_SUNTON_4827S043R` | not supported | 480 x 272 | RGB | 16-bit RGB (S3 only) | XPT2046 (resistive) | active high |
+| RGB | `LB_SUNTON_8048S070C` | not supported | 800 x 480 | RGB | 16-bit RGB (S3 only) | GT911 (capacitive) | active high |
+| RGB | `LB_VGA_800X600` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
+| ILI9341 | `LB_ILI9341_240X320` | not supported | 240 x 320 | ILI9341 | SPI 40 MHz | — | active high |
+| ILI9327 | `LB_ILI9327_400X240` | not supported | 400 x 240 | ILI9327 | 8-bit parallel | — | active high |
+| ILI9486 | `LB_ILI9486_480X320` | not supported | 480 x 320 | ILI9486 | SPI 20 MHz | — | active high |
+| ILI9341 | `LB_ILI9341_320X240` | not supported | 320 x 240 | ILI9341 | SPI 40 MHz | — | active high |
+| ST7305 | `LB_ST7305_400X300` | not supported | 400 x 300 | ST7305 | SPI 10 MHz | — | active high |
 
 Their pins are in `panels.yaml`. The ILI9486 module's resistive touch is not
 supported: its XPT2046 never answered on the pins we were given.
