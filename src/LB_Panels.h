@@ -97,6 +97,7 @@ struct LB_PanelDef {
 
 static const LB_RgbBoard LB_RGB_SUNTON_4827S043R = { 10000000, 4, 43, 8, 4, 12, 8, true, 40, 41, 39, 42, 2, {8, 3, 46, 9, 1, 5, 6, 7, 15, 16, 4, 45, 48, 47, 21, 14}, -1, -1, 18, -1, 12, 13, 11, 38, true, true };
 static const LB_RgbBoard LB_RGB_SUNTON_8048S070C = { 12500000, 30, 16, 210, 13, 10, 22, true, 41, 40, 39, 42, 2, {15, 7, 6, 5, 4, 9, 46, 3, 8, 16, 1, 14, 21, 47, 48, 45}, 19, 20, -1, 38, -1, -1, -1, -1, false, false };
+static const LB_RgbBoard LB_RGB_VGA_800X600 = { 32000000, 32, 78, 24, 4, 11, 3, false, -1, 1, 2, -1, -1, {11, 12, 13, 14, 21, 17, 18, 8, 3, 9, 10, 7, 15, 16, 38, 39}, -1, -1, -1, -1, -1, -1, -1, -1, false, false };
 static const LB_SpiBoard LB_SPI_ILI9486_480X320 = { 16, -1, 0, 23, 19, 18, 2, 15, 4 };
 static const LB_Par8Board LB_PAR8_TAP_196_CTP = { {5, 6, 4, 7, 15, 1, 10, 11}, 2, 42, -1, 41, -1, -1, 13, 12, -1, -1 };
 static const LB_Par8Board LB_PAR8_ILI9327_400X240 = { {14, 12, 13, 15, 2, 4, 16, 17}, 33, 27, 5, 26, 18, 32, -1, -1, -1, -1 };
@@ -132,6 +133,7 @@ static const LB_PanelDef LB_PANELS[] = {
   { "square_392", "3.92 inch square", LB_DRV_ST7796, 320, 320, 0, true, true, false, false, 0, 0, 0, 160, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
   { "sunton_4827s043r", "Sunton ESP32-4827S043R", LB_DRV_RGB, 480, 272, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_XPT2046, false, false, false, &LB_RGB_SUNTON_4827S043R, {188, 3951, 254, 3791}, nullptr, nullptr },
   { "sunton_8048s070c", "Sunton ESP32-8048S070C", LB_DRV_RGB, 800, 480, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_GT911, false, false, false, &LB_RGB_SUNTON_8048S070C, {0, 0, 0, 0}, nullptr, nullptr },
+  { "vga_800x600", "Lonely Binary ESP32-S3 VGA 800x600", LB_DRV_RGB, 800, 600, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_NONE, false, false, false, &LB_RGB_VGA_800X600, {0, 0, 0, 0}, nullptr, nullptr },
   { "ili9341_240x320", "ILI9341 240x320", LB_DRV_ILI9341, 240, 320, 0, true, false, false, false, 0, 0, 0, 0, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
   { "ili9327_400x240", "ILI9327 400x240", LB_DRV_ILI9327, 240, 400, 1, true, false, false, false, 0, 0, 0, 32, 0, false, LB_INIT_NONE, LB_BUS_PAR8, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, &LB_PAR8_ILI9327_400X240, nullptr },
   { "ili9486_480x320", "ILI9486 480x320", LB_DRV_ILI9486, 320, 480, 3, true, false, false, false, 0, 0, 0, 0, 20000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, &LB_SPI_ILI9486_480X320 },
@@ -139,7 +141,7 @@ static const LB_PanelDef LB_PANELS[] = {
   { "st7305_400x300", "ST7305 400x300 RLCD", LB_DRV_ST7305, 400, 300, 0, false, true, false, false, 0, 0, 0, 0, 10000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr },
 };
 
-#define LB_PANEL_COUNT 35
+#define LB_PANEL_COUNT 36
 
 // Pass one of these to LB_Display. Changing this constant is the only
 // edit needed to swap panels — everything else is inherited.
@@ -179,8 +181,9 @@ static const LB_PanelDef LB_PANELS[] = {
 // the products above. If you bought a display from us it is up there.
 #define LB_SUNTON_4827S043R (&LB_PANELS[28])   // RGB 480x272
 #define LB_SUNTON_8048S070C (&LB_PANELS[29])   // RGB 800x480
-#define LB_ILI9341_240X320  (&LB_PANELS[30])   // ILI9341 240x320
-#define LB_ILI9327_400X240  (&LB_PANELS[31])   // ILI9327 240x400
-#define LB_ILI9486_480X320  (&LB_PANELS[32])   // ILI9486 320x480
-#define LB_ILI9341_320X240  (&LB_PANELS[33])   // ILI9341 240x320
-#define LB_ST7305_400X300   (&LB_PANELS[34])   // ST7305 400x300
+#define LB_VGA_800X600      (&LB_PANELS[30])   // RGB 800x600
+#define LB_ILI9341_240X320  (&LB_PANELS[31])   // ILI9341 240x320
+#define LB_ILI9327_400X240  (&LB_PANELS[32])   // ILI9327 240x400
+#define LB_ILI9486_480X320  (&LB_PANELS[33])   // ILI9486 320x480
+#define LB_ILI9341_320X240  (&LB_PANELS[34])   // ILI9341 240x320
+#define LB_ST7305_400X300   (&LB_PANELS[35])   // ST7305 400x300

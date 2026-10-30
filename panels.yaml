@@ -828,6 +828,44 @@ panels:
       MISO 13), headers P1 (UART0 43/44) and P4 (17, 18).
       The 750 KB framebuffer is scanned out of PSRAM at 25 MB/s.
 
+  - id: vga_800x600
+    product: false
+    const: LB_VGA_800X600
+    name: 'Lonely Binary ESP32-S3 VGA 800x600'
+    family: board
+    driver: RGB
+    bus: rgb
+    width: 800
+    height: 600
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    backlight_active_low: false
+    rgb:
+      # VESA 800x600@60 is 40 MHz, but the PSRAM was measured at about 60 MB/s and RGB565 at 40 MHz needs 80: it shifted lines left and
+      # right. 32 MHz (PLL160 / 5, 58.8 Hz) needs 64 MB/s and ran steady in the VGA sketches, so the board has the picture to itself
+      # and a sketch must not do big PSRAM reads or writes while it runs. Two frame buffers and ten-line bounce buffers (600 / 10 = 60).
+      pclk_hz: 32000000
+      # Positive-going sync pulses, as VESA 800x600 asks (idle low).
+      hsync: {pulse: 32, back: 78, front: 24}
+      vsync: {pulse: 4, back: 11, front: 3}
+      pclk_active_neg: false
+      pins:
+        # A VGA monitor has no data-enable and takes no pixel clock: both are -1, which esp_lcd runs as HV mode, the sync pulses alone
+        # framing the picture. The 16 data lines are a resistor ladder (5-6-5) into the DE-15 connector.
+        de: -1
+        vsync: 1
+        hsync: 2
+        pclk: -1
+        backlight: -1
+        r: [7, 15, 16, 38, 39]      # R0..R4
+        g: [17, 18, 8, 3, 9, 10]    # G0..G5
+        b: [11, 12, 13, 14, 21]     # B0..B4
+    notes: >-
+      VGA out of an ESP32-S3 N16R8 through a 16-bit R2R ladder (output/VGA/PCB, 14-bit V4 board), 800x600 at 58.8 Hz. No touch. BOOT
+      (GPIO0) is the only button; UART0 is GPIO43/44. Pins and timings are the ones that ran in the VGA_PhotoGallery sketch.
+
   # ── Panels we do NOT sell ──────────────────────────────────────────────────
   #
   # Driveable, but not products. Keyed by controller + resolution so nobody
