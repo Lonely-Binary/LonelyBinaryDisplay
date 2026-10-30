@@ -35,6 +35,11 @@ jobs:
         with:
           repository: Lonely-Binary/LonelyBinaryGFX
           path: .deps/LonelyBinaryGFX
+      # TapWatchLVGL needs Lonely Binary LVGL (LVGL itself is bundled in it).
+      - uses: actions/checkout@v4
+        with:
+          repository: Lonely-Binary/LonelyBinaryLVGL
+          path: .deps/LonelyBinaryLVGL
       - uses: arduino/setup-arduino-cli@v2
       - name: Install core and dependencies
         run: |
@@ -49,7 +54,7 @@ jobs:
           for fqbn in esp32:esp32:esp32s3 esp32:esp32:esp32; do
             for ex in examples/*/; do
               echo "== $fqbn $ex"
-              arduino-cli compile --fqbn "$fqbn" --library . --library .deps/LonelyBinaryGFX "$ex"
+              arduino-cli compile --fqbn "$fqbn" --library . --library .deps/LonelyBinaryGFX --library .deps/LonelyBinaryLVGL "$ex"
             done
           done
 
@@ -65,7 +70,7 @@ jobs:
                      LB_ILI9341_240X320; do
               sed "s/LB_TFT_24/$p/" examples/SelfTest/SelfTest.ino > /tmp/PanelSweep/PanelSweep.ino
               echo "== $fqbn $p"
-              arduino-cli compile --fqbn "$fqbn" --library . --library .deps/LonelyBinaryGFX /tmp/PanelSweep
+              arduino-cli compile --fqbn "$fqbn" --library . --library .deps/LonelyBinaryGFX --library .deps/LonelyBinaryLVGL /tmp/PanelSweep
             done
           done
 
