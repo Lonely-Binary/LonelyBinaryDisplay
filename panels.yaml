@@ -829,7 +829,7 @@ panels:
       The 750 KB framebuffer is scanned out of PSRAM at 25 MB/s.
 
   - id: vga_800x600
-    product: false
+    product: true
     const: LB_VGA_800X600
     name: 'Lonely Binary ESP32-S3 VGA 800x600'
     family: board
@@ -843,10 +843,14 @@ panels:
     invert: false
     backlight_active_low: false
     rgb:
-      # VESA 800x600@60 is 40 MHz, but the PSRAM was measured at about 60 MB/s and RGB565 at 40 MHz needs 80: it shifted lines left and
-      # right. 32 MHz (PLL160 / 5, 58.8 Hz) needs 64 MB/s and ran steady in the VGA sketches, so the board has the picture to itself
-      # and a sketch must not do big PSRAM reads or writes while it runs. Two frame buffers and ten-line bounce buffers (600 / 10 = 60).
-      pclk_hz: 36000000
+      # 32 MHz over 1024 x 625 total pixels = 800x600 @ 50 Hz, positive sync. The standard VESA 800x600 @ 56 Hz is 36 MHz and was
+      # tried first, but it leaves no margin: the bounce buffers (10 lines, 16000 bytes) are refilled from PSRAM by a CPU copy that
+      # must finish in 10 line times. Measured with the picture running: a cold copy takes 250-300 us and the budget at 36 MHz is
+      # 284 us (320 us at 32 MHz), so whether a line makes it depends on what the data cache holds - short streaks at the left of
+      # some lines, and a one-line change in a sketch could switch them on or off. At 32 MHz the same code is clean.
+      # (VESA 800x600 @ 60 is 40 MHz and needs 80 MB/s; the PSRAM manages about 60.) A sketch must still not do big PSRAM reads or
+      # writes while it runs, and the Wi-Fi radio on makes the picture shake. Two frame buffers and ten-line bounce buffers (600 / 10 = 60).
+      pclk_hz: 32000000
       # Positive-going sync pulses, as VESA 800x600 asks (idle low).
       hsync: {pulse: 72, back: 128, front: 24}
       vsync: {pulse: 2, back: 22, front: 1}
@@ -863,7 +867,7 @@ panels:
         g: [17, 18, 8, 3, 9, 10]    # G0..G5
         b: [11, 12, 13, 14, 21]     # B0..B4
     notes: >-
-      VGA out of an ESP32-S3 N16R8 through a 16-bit R2R ladder (output/VGA/PCB, 14-bit V4 board), 800x600 at 58.8 Hz. No touch. BOOT
+      VGA out of an ESP32-S3 N16R8 through a 16-bit R2R ladder (output/VGA/PCB, 14-bit V4 board), 800x600 at 50 Hz. No touch. Drawing into the screen manages 2 to 5 million pixels a second (a full-screen fill takes about 0.23 s), because the scan-out takes most of the PSRAM bandwidth. BOOT
       (GPIO0) is the only button; UART0 is GPIO43/44. Pins and timings are the ones that ran in the VGA_PhotoGallery sketch.
 
   # ── Panels we do NOT sell ──────────────────────────────────────────────────
