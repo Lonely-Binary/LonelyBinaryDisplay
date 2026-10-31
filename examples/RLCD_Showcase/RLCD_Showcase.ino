@@ -12,10 +12,10 @@
     7  LOW POWER         the panel drops to its slow, few-microamp mode and
                          updates once a second
 
-  dance_213.h (250 x 122) and dance_290.h (384 x 168) are made from a video by
-  tools/video_to_rlcd.py; run that script on any clip (see its header) to make
-  one for another size, or from your own video. A clip smaller than the screen
-  is centred; one larger than the screen is skipped.
+  dance_213.h (250 x 122), dance_290.h (384 x 168) and dance_420.h (400 x 300)
+  are made from a video by tools/video_to_rlcd.py; run that script on any clip
+  (see its header) to make one for another size, or from your own video. A clip
+  smaller than the screen is centred; one larger than the screen is skipped.
 
   The BOOT button (GPIO 0) skips to the next scene.
 
@@ -42,8 +42,8 @@
   #define RLCD_PANEL LB_RLCD_290
   #include "dance_290.h"
 #else
-  #define RLCD_PANEL LB_RLCD_420   // the 384 x 168 video, centred
-  #include "dance_290.h"
+  #define RLCD_PANEL LB_RLCD_420
+  #include "dance_420.h"
 #endif
 
 LB_Display display(RLCD_PANEL);

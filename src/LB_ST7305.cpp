@@ -2,6 +2,8 @@
 
 #include <esp_heap_caps.h>
 
+static void lb_lumaTables();
+
 // ─── The ST7305 panels ──────────────────────────────────────────────────────
 //
 // One controller, four glasses, and what differs between them is data: the
@@ -205,6 +207,7 @@ bool LB_ST7305::begin(int32_t hz, bool, bool invert) {
     return false;
   }
   _cfg = cfg;
+  lb_lumaTables();
   _nw = _panel->width;
   _nh = _panel->height;
 
@@ -270,23 +273,49 @@ void LB_ST7305::pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint
   }
 }
 
-// RGB565 -> white? Rec.601 luma, half scale.
-static inline bool lb_white(uint16_t c) {
-  const uint32_t r = (c >> 8) & 0xF8, g = (c >> 3) & 0xFC, b = (c << 3) & 0xF8;
-  return ((r * 77 + g * 150 + b * 29) >> 8) >= 128;
+// RGB565 -> white? Rec.601 luma at or above half scale, i.e.
+// (R * 77 + G * 150 + B * 29) >> 8 >= 128 with R, G, B scaled to 8 bits. Luma is
+// linear in R, G and B, so it splits across the two bytes of the pixel: one
+// 256-entry table for the high byte (R and the top of G), one for the low byte
+// (the rest of G and B), and the test is two loads, an add and a compare. The
+// tables hold the unshifted sums, so the result is bit-for-bit the formula
+// above. Filled on the first begin().
+static uint16_t lb_lumaHi[256], lb_lumaLo[256];
+static void lb_lumaTables() {
+  if (lb_lumaHi[0xFF]) return;                                    // 52696 once filled
+  for (int i = 0; i < 256; i++) {
+    const uint32_t r = (i >> 3) << 3, gh = (i & 7) << 5;          // the high byte: RRRRRGGG
+    const uint32_t gl = (i >> 5) << 2, b = (i & 0x1F) << 3;       // the low byte:  GGGBBBBB
+    lb_lumaHi[i] = r * 77 + gh * 150;
+    lb_lumaLo[i] = gl * 150 + b * 29;
+  }
 }
+static inline uint32_t lb_white1(uint16_t c) {           /* 1 = white: the sums stay below 65536 */
+  return ((uint32_t)lb_lumaHi[c >> 8] + lb_lumaLo[c & 0xFF]) >> 15;
+}
+static inline bool lb_white(uint16_t c) { return lb_white1(c); }
 
-// The canvas pixel that sits at native (nx, ny) - native being the panel's own
-// orientation at rotation 0, rows counted from the top.
-static inline size_t lb_src(uint8_t rotation, int16_t nx, int16_t ny, int16_t w, int16_t nw, int16_t nh) {
+// Where native row ny starts in the canvas, and how far apart its pixels are.
+// Native is the panel's own orientation at rotation 0, rows counted from the
+// top; the canvas is _w wide at the current rotation. Worked out once a row,
+// not once a pixel: with a switch and two multiplies per pixel the 4.2 inch
+// took 40 ms to pack, which is most of a frame.
+static inline const uint16_t *lb_row(const uint16_t *fb, uint8_t rotation, int16_t ny,
+                                     int16_t w, int16_t nw, int16_t nh, int32_t *step) {
   switch (rotation) {
-    case 1:  return (size_t)nx * w + (nh - 1 - ny);              /* x = nh-1-ny, y = nx */
-    case 2:  return (size_t)(nh - 1 - ny) * w + (nw - 1 - nx);
-    case 3:  return (size_t)(nw - 1 - nx) * w + ny;              /* x = ny, y = nw-1-nx */
-    default: return (size_t)ny * w + nx;
+    case 1:  *step = w;  return fb + (nh - 1 - ny);                   /* x = nh-1-ny, y = nx */
+    case 2:  *step = -1; return fb + (size_t)(nh - 1 - ny) * w + (nw - 1);
+    case 3:  *step = -w; return fb + (size_t)(nw - 1) * w + ny;       /* x = ny, y = nw-1-nx */
+    default: *step = 1;  return fb + (size_t)ny * w;
   }
 }
 
+// The pack is the whole cost of a flush on the 4.2 inch (the 15 KB frame takes
+// 6.5 ms on the wire). It is written for speed and built at -O2: 52 ms as first
+// written, 18.5 ms now, against a 31 ms panel frame.
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((optimize("O2")))
+#endif
 void LB_ST7305::flushFramebuffer(const uint16_t *fb) {
   if (!fb || !_packed || !_cfg) return;
   const LB_St7305Cfg &c = *_cfg;
@@ -301,19 +330,35 @@ void LB_ST7305::flushFramebuffer(const uint16_t *fb) {
     //
     // i.e. each byte is a 2-wide, 4-tall block, rows counted from the bottom of
     // the panel, bit 7 the block's top-left pixel in that bottom-up order.
+    //
+    // Walked in the canvas's row order, not the panel's byte order. The canvas
+    // is in PSRAM, and reading it a column at a time (an 800-byte stride from
+    // one pixel to the next) missed the cache on every pixel: 46 ms of a 52 ms
+    // flush on the 4.2 inch. Row by row it streams, and the packed frame sits
+    // in internal RAM, where the scattered writes cost nothing.
     const int16_t bytesPerCol = _nh / 4;
-    for (int16_t bx = 0; bx < _nw / 2; bx++) {
-      for (int16_t by = 0; by < bytesPerCol; by++) {
-        uint8_t v = 0;
-        for (uint8_t ly = 0; ly < 4; ly++) {
-          const int16_t ny = _nh - 1 - (by * 4 + ly);
-          for (uint8_t lx = 0; lx < 2; lx++) {
-            const int16_t nx = bx * 2 + lx;
-            const bool white = lb_white(fb[lb_src(_rotation, nx, ny, _w, _nw, _nh)]);
-            if (white != oneIsBlack) v |= 1 << (7 - ((ly << 1) | lx));
-          }
+    const uint32_t ink = oneIsBlack ? 3 : 0;          // a set bit is black: flip both bits of the pair
+    memset(out, 0, _packedLen);
+    for (int16_t ny = 0; ny < _nh; ny++) {
+      const int16_t iy = _nh - 1 - ny;
+      uint8_t *o = out + (iy >> 2);
+      const uint8_t shift = 6 - ((iy & 3) << 1);     // the pair's low bit (lx = 1); lx = 0 is one higher
+      int32_t step;
+      const uint16_t *px = lb_row(fb, _rotation, ny, _w, _nw, _nh, &step);
+      if (step == 1 && !((uintptr_t)px & 3)) {
+        // Rotation 0: the row is contiguous and word-aligned, so take two
+        // pixels a load. (Rotation 2 would be contiguous too, but backwards.)
+        const uint32_t *p2 = (const uint32_t *)px;
+        for (int16_t bx = 0; bx < _nw / 2; bx++, o += bytesPerCol) {
+          const uint32_t p = p2[bx];
+          const uint32_t pair = (lb_white1((uint16_t)p) << 1) | lb_white1((uint16_t)(p >> 16));
+          *o |= (uint8_t)((pair ^ ink) << shift);
         }
-        *out++ = v;
+      } else {
+        for (int16_t bx = 0; bx < _nw / 2; bx++, px += 2 * step, o += bytesPerCol) {
+          const uint32_t pair = (lb_white1(px[0]) << 1) | lb_white1(px[step]);
+          *o |= (uint8_t)((pair ^ ink) << shift);
+        }
       }
     }
   } else {
@@ -325,19 +370,29 @@ void LB_ST7305::flushFramebuffer(const uint16_t *fb) {
     //
     // each byte a 4-wide, 2-tall block, rows counted from the top.
     const int16_t dataW = (c.colOffset + _nw + 3) / 4;
-    for (int16_t by = 0; by < _nh / 2; by++) {
-      for (int16_t bx = 0; bx < dataW; bx++) {
-        uint8_t v = 0;
-        for (uint8_t ly = 0; ly < 2; ly++) {
-          const int16_t ny = c.flipY ? _nh - 1 - (by * 2 + ly) : by * 2 + ly;
-          for (uint8_t lx = 0; lx < 4; lx++) {
-            const int16_t nx = bx * 4 + lx - c.colOffset;
-            const bool white = (nx < 0 || nx >= _nw) ? true   /* off the glass: blank */
-                                                     : lb_white(fb[lb_src(_rotation, nx, ny, _w, _nw, _nh)]);
-            if (white != oneIsBlack) v |= 1 << (7 - ((lx << 1) | ly));
-          }
+    memset(out, 0, _packedLen);
+    for (int16_t ny = 0; ny < _nh; ny++) {
+      const int16_t ry = c.flipY ? _nh - 1 - ny : ny;         // the RAM row this canvas row lands in
+      uint8_t *row = out + (size_t)(ry >> 1) * dataW;
+      const uint8_t ly = ry & 1;
+      int32_t step;
+      const uint16_t *px = lb_row(fb, _rotation, ny, _w, _nw, _nh, &step);
+      for (int16_t nx = 0; nx < _nw; nx++, px += step) {
+        if (lb_white(*px) == oneIsBlack) continue;
+        const int16_t rx = nx + c.colOffset;
+        row[rx >> 2] |= 1 << (7 - (((rx & 3) << 1) | ly));
+      }
+    }
+    // RAM columns off the glass are blank, i.e. white: a clear bit on every
+    // layout-1 panel so far (blackIsOne), a set one on a glass where a set bit
+    // is white.
+    if (!oneIsBlack) {
+      for (int16_t by = 0; by < _nh / 2; by++) {
+        uint8_t *row = out + (size_t)by * dataW;
+        for (int16_t rx = 0; rx < dataW * 4; rx++) {
+          if (rx >= c.colOffset && rx < c.colOffset + _nw) continue;
+          row[rx >> 2] |= 3 << (6 - ((rx & 3) << 1));
         }
-        *out++ = v;
       }
     }
   }
