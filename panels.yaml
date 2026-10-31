@@ -846,10 +846,10 @@ panels:
       # VESA 800x600@60 is 40 MHz, but the PSRAM was measured at about 60 MB/s and RGB565 at 40 MHz needs 80: it shifted lines left and
       # right. 32 MHz (PLL160 / 5, 58.8 Hz) needs 64 MB/s and ran steady in the VGA sketches, so the board has the picture to itself
       # and a sketch must not do big PSRAM reads or writes while it runs. Two frame buffers and ten-line bounce buffers (600 / 10 = 60).
-      pclk_hz: 32000000
+      pclk_hz: 36000000
       # Positive-going sync pulses, as VESA 800x600 asks (idle low).
-      hsync: {pulse: 32, back: 78, front: 24}
-      vsync: {pulse: 4, back: 11, front: 3}
+      hsync: {pulse: 72, back: 128, front: 24}
+      vsync: {pulse: 2, back: 22, front: 1}
       pclk_active_neg: false
       pins:
         # A VGA monitor has no data-enable and takes no pixel clock: both are -1, which esp_lcd runs as HV mode, the sync pulses alone
