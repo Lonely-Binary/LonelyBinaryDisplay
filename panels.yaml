@@ -506,7 +506,12 @@ panels:
     notes: >-
       OSPTEK YDP420HT004-V3, from the vendor's test sketch (higher drive voltages than
       the Waveshare module below, which is the same glass size). Needs PSRAM for the
-      240 KB canvas. UNVERIFIED: no unit on hand yet.
+      240 KB canvas. Verified 2026-11-01 on an ESP32-S3 (N16R8 dev board) on the
+      kit pins with RLCD_Check: pixel layout, orientation and polarity (black ink
+      on a white page at invert false) all correct. Canvas in PSRAM; flush 18.5 ms
+      (6.5 ms of it the 15 KB frame on the wire at 20 MHz, the rest packing);
+      low-power mode 120 ms in / 320 ms out. A loose FPC shows as a blank panel
+      with begin() still succeeding - the controller answers nothing over SPI.
 
   # ── RTP series (resistive touch, SPI) ──────────────────────────────────────
   #
