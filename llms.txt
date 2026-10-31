@@ -127,6 +127,7 @@ hand.
 | 2.0 inch square | `LB_SQUARE_200` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 2.31 inch square | `LB_SQUARE_231` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 3.92 inch square | `LB_SQUARE_392` | `SQUARE_392` | 320 x 320 | ST7796 | SPI 40 MHz | — | active high |
+| Lonely Binary ESP32-S3 VGA 800x600 | `LB_VGA_800X600` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 
 **Screen size is the size after the panel's default rotation**, which is
 what `width()` / `height()` return and what you should lay a UI out
@@ -160,7 +161,6 @@ controller may well need `setColorOrder()` / `setInverted()` /
 |---|---|---|---|---|---|---|---|
 | RGB | `LB_SUNTON_4827S043R` | not supported | 480 x 272 | RGB | 16-bit RGB (S3 only) | XPT2046 (resistive) | active high |
 | RGB | `LB_SUNTON_8048S070C` | not supported | 800 x 480 | RGB | 16-bit RGB (S3 only) | GT911 (capacitive) | active high |
-| RGB | `LB_VGA_800X600` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 | ILI9341 | `LB_ILI9341_240X320` | not supported | 240 x 320 | ILI9341 | SPI 40 MHz | — | active high |
 | ILI9327 | `LB_ILI9327_400X240` | not supported | 400 x 240 | ILI9327 | 8-bit parallel | — | active high |
 | ILI9486 | `LB_ILI9486_480X320` | not supported | 480 x 320 | ILI9486 | SPI 20 MHz | — | active high |
@@ -170,6 +170,29 @@ controller may well need `setColorOrder()` / `setInverted()` /
 <!-- END GENERATED PANEL TABLE -->
 
 ---
+
+## VGA 800x600 (`LB_VGA_800X600`) - on sale
+
+A Lonely Binary VGA board with an ESP32-S3 (N16R8). 800 x 600 @ 50 Hz (32 MHz pixel clock), RGB565,
+scanned out of a PSRAM framebuffer; no controller, no touch, S3 only, rotation 0
+only, MicroPython not supported. Same `LB_Display` API as every other panel.
+
+- Tools > Board "ESP32S3 Dev Module", PSRAM "OPI PSRAM", USB CDC On Boot
+  "Disabled", Partition Scheme "Huge APP" for large sketches.
+- `begin()` always gives a framebuffer (`begin(true)` is not needed). Drawing
+  reaches the monitor only after `flush()`.
+- Drawing into the screen is slow because the scan-out uses most of the PSRAM
+  bandwidth: 2-5 million pixels a second, a full-screen fill ~0.23 s, a
+  full-screen `drawJpg` ~1.3 s. Animate by erasing and redrawing small areas;
+  never repaint the screen per frame.
+- Keep Wi-Fi/Bluetooth off while the picture matters; the radio makes it shake.
+- Wait for a frame with `scanStats(&frames, &late, &maxUs)`: `frames` increases
+  once per frame (50 per second), `late` must stay 0.
+- Never name a constant `PS`, `OK`, `WARN` or `CRIT` in a sketch: ESP32 headers
+  define them as macros.
+- Examples `Vga01_Hello` ... `Vga12_LVGL` (File > Examples > Lonely Binary
+  Display) go from hello-world to a game and an LVGL dashboard; copy the one
+  closest to the task.
 
 ## Arduino / C++
 

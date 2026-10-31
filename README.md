@@ -22,6 +22,12 @@ Arduino/C++ **and** MicroPython, from one shared panel table.
 > `TFT_eSPI` and `Adafruit_ST7789` code it was trained on, which is confidently
 > wrong for these panels and reads like a dead screen.
 
+> **Now on sale: the Lonely Binary ESP32-S3 VGA 800 x 600.** A VGA output
+> board that plugs into any monitor, sold together with an ESP32-S3 (N16R8).
+> `LB_Display display(LB_VGA_800X600);` and the same drawing calls as every
+> other display here. [Jump to it](#vga-800-x-600-esp32-s3) - twelve examples
+> take you from `Hello` to a game and an LVGL dashboard.
+
 ---
 
 ## Supported panels
@@ -56,6 +62,7 @@ Arduino/C++ **and** MicroPython, from one shared panel table.
 | 2.0 inch square | `LB_SQUARE_200` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 2.31 inch square | `LB_SQUARE_231` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 3.92 inch square | `LB_SQUARE_392` | `SQUARE_392` | 320 x 320 | ST7796 | SPI 40 MHz | — | active high |
+| VGA 800 x 600, with ESP32-S3 | `LB_VGA_800X600` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 
 ### Third-party screens
 
@@ -67,7 +74,6 @@ for the table above. Each carries its own pins; override them with `setWiring()`
 |---|---|---|---|---|---|---|---|
 | RGB | `LB_SUNTON_4827S043R` | not supported | 480 x 272 | RGB | 16-bit RGB (S3 only) | XPT2046 (resistive) | active high |
 | RGB | `LB_SUNTON_8048S070C` | not supported | 800 x 480 | RGB | 16-bit RGB (S3 only) | GT911 (capacitive) | active high |
-| RGB | `LB_VGA_800X600` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 | ILI9341 | `LB_ILI9341_240X320` | not supported | 240 x 320 | ILI9341 | SPI 40 MHz | — | active high |
 | ILI9327 | `LB_ILI9327_400X240` | not supported | 400 x 240 | ILI9327 | 8-bit parallel | — | active high |
 | ILI9486 | `LB_ILI9486_480X320` | not supported | 480 x 320 | ILI9486 | SPI 20 MHz | — | active high |
@@ -89,6 +95,111 @@ driver IC, resolution, offsets, colour order and backlight polarity all follow
 from it, and there is never more than one entry for a size.
 
 ---
+
+## VGA 800 x 600 (ESP32-S3)
+
+**Available now.** The Lonely Binary VGA board is sold together with an
+ESP32-S3 (N16R8: 16 MB flash, 8 MB octal PSRAM). It turns 16 GPIO lines into
+the three analog colour signals of a VGA connector with a resistor ladder and
+sends an **800 x 600 @ 50 Hz** picture, 65,536 colours, to any VGA
+monitor (a 32 MHz pixel clock: the standard 56 Hz timing needs 36 MHz, which
+leaves the memory reads that feed the screen no margin and shows as short
+streaks at the left of some lines). There is no controller and no screen memory on the board: the
+ESP32-S3 sends every pixel of every frame, forever, out of a framebuffer in
+PSRAM.
+
+```cpp
+#include <LonelyBinaryDisplay.h>
+
+LB_Display display(LB_VGA_800X600);
+
+void setup() {
+  display.begin();
+  display.fillScreen(LB_BLACK);
+  display.setTextColor(LB_WHITE);
+  display.setTextSize(8);
+  display.drawString("Hello, VGA!", 40, 40);
+  display.flush();
+}
+
+void loop() {}
+```
+
+### Board settings (Tools menu)
+
+| Setting | Value | If you get it wrong |
+|---|---|---|
+| Board | **ESP32S3 Dev Module** | The pins are those of the ESP32-S3 |
+| PSRAM | **OPI PSRAM** | `begin()` returns false and says the framebuffer needs PSRAM |
+| USB CDC On Boot | **Disabled** | `Serial` goes to native USB and nothing appears on the UART |
+| Partition Scheme | **Huge APP** | Only the photo and LVGL examples are large enough to need it |
+
+### What to know before you draw
+
+- **Call `flush()`** after drawing. The pixels are written through the CPU
+  cache, and `flush()` is what pushes them to the PSRAM the monitor reads.
+- **Drawing is slow, and that is physics, not a bug.** The picture being sent to the
+  monitor uses most of the PSRAM bandwidth, so drawing into it manages only 2
+  to 5 million pixels a second: a full-screen fill takes about 0.23 s, a
+  full-screen JPEG about 1.3 s. Redraw what changed, not the screen. Every
+  animation example does this.
+- **Keep Wi-Fi and Bluetooth off while the picture matters.** The radio and
+  the screen share the PSRAM bus, and the picture shakes while the radio is
+  on. Turn it on, fetch what you need, turn it off.
+- **Draw what changed; never wipe a region and redraw it.** The monitor reads
+  the screen while you write, so a wiped region blinks. Draw the fixed parts
+  once and update text with `setTextColor(fg, bg)`. The examples do this.
+- **Keep important things about 24 pixels from the top and 16 from the sides**;
+  monitors crop a picture that is not a standard preset.
+- **Rotation 0 only**, no touch, and the only button is BOOT (GPIO 0).
+  MicroPython is not supported on this board yet.
+- **Is the picture healthy?** `display.scanStats(&frames, &late, &maxUs)`
+  reports frames sent and *late* frames. A healthy picture is 50 frames a
+  second and 0 late. (The frame rate alone proves nothing: the picture can be
+  broken and still count 50. It also cannot see the streaks described above: it
+  measures the length of a frame, not of a line.)
+
+If the monitor shows no picture, or a shifted or cropped one, press its AUTO
+button; and run `Vga02_ColorBars`, which tells a broken wiring line from a
+monitor problem.
+
+**Why 50 Hz and not the standard 56 Hz?** The screen is fed by a CPU copy from
+PSRAM that must finish within 10 line times; at the standard 36 MHz a cold
+copy takes about as long as the budget, so some lines arrive late and show as
+short streaks at the left. At 32 MHz there is margin and the picture is clean.
+The measurements, and everything else about the board, are in
+[`docs/VGA_800x600.md`](docs/VGA_800x600.md).
+
+### Examples
+
+Start at the top and go down: each one adds one idea to the ones before.
+**File ▸ Examples ▸ Lonely Binary Display ▸ Vga01_Hello** and so on.
+
+| Example | You build | You learn |
+|---|---|---|
+| `Vga01_Hello` | Text in the middle of the screen | The four lines every sketch starts with; `flush()` |
+| `Vga02_ColorBars` | Colour bars, ramps and 16 wiring patches | Self-test: find a bad data line in a minute. **Run this first.** |
+| `Vga03_Shapes` | Every shape on a 100 px grid | The coordinate system; `draw*` vs `fill*` |
+| `Vga04_Text` | Two fonts, sizes 1-8, colours, alignment | `setTextSize`, `textWidth`, text on a background |
+| `Vga05_Bounce` | Eight bouncing balls | The animation loop: erase, move, draw; frame timing |
+| `Vga06_Photo` | A photo slideshow | `drawJpg`, scaling, and `make_photos.py` for your own pictures |
+| `Vga07_Clock` | Analog and digital clock | `sin`/`cos`, thick lines, repainting one area a second |
+| `Vga08_Chart` | A live scrolling chart and bars | Mapping values to pixels; plotting a sensor |
+| `Vga09_SerialScreen` | `Serial` on the monitor, 100 x 37 characters | Your own print target; a scrolling text buffer |
+| `Vga10_Hop` | A one-button jumping game (BOOT) | A game loop; gravity; collisions; high score |
+| `Vga11_Dashboard` | A status board for the ESP32-S3 | Tiles, big numbers, bars, sparklines |
+| `Vga12_LVGL` | A full widget dashboard, two pages | LVGL: layouts, gauges, charts (needs *Lonely Binary LVGL*) |
+
+Put your own sensor into `Vga08_Chart` or `Vga11_Dashboard` and you have a
+useful display; put your own pictures into `Vga06_Photo` and you have a photo
+frame.
+
+### Pins
+
+The pins are fixed by the board and need no setup. They are
+in `panels.yaml` (entry `vga_800x600`): HSYNC GPIO 2, VSYNC GPIO 1,
+R0..R4 = 7, 15, 16, 38, 39; G0..G5 = 17, 18, 8, 3, 9, 10;
+B0..B4 = 11, 12, 13, 14, 21. UART0 (the serial port) is GPIO 43 / 44.
 
 ## Arduino
 
