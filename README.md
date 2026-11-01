@@ -27,6 +27,10 @@ Arduino/C++ **and** MicroPython, from one shared panel table.
 > `LB_Display display(LB_VGA_800X600);` and the same drawing calls as every
 > other display here. [Jump to it](#vga-800-x-600-esp32-s3) - twelve examples
 > take you from `Hello` to a game and an LVGL dashboard.
+>
+> **VGA requires PSRAM to be enabled.** In the Arduino IDE set
+> **Tools ▸ PSRAM ▸ OPI PSRAM** before you upload. Without it the screen stays
+> blank.
 
 ---
 
@@ -56,6 +60,7 @@ Arduino/C++ **and** MicroPython, from one shared panel table.
 | 2.4 inch, resistive touch | `LB_RTP_240` | `RTP_240` | 320 x 240 | ST7789 | SPI 40 MHz | NS2009 (resistive) | active low |
 | 2.8 inch, resistive touch | `LB_RTP_280` | `RTP_280` | 320 x 240 | ST7789 | SPI 40 MHz | NS2009 (resistive) | active low |
 | 4.3 inch, resistive touch | `LB_RTP_430` | not supported | 480 x 272 | NV3041A | SPI 20 MHz | NS2009 (resistive) | active low |
+| 3.5 inch, resistive touch | `LB_RTP_350` | not supported | 320 x 480 | ST7796 | 8-bit parallel | NS2009 (resistive) | active high |
 | 0.85 inch square | `LB_SQUARE_085` | `SQUARE_085` | 128 x 128 | ST7735 | SPI 20 MHz | — | active low |
 | 1.33 inch square | `LB_SQUARE_133` | `SQUARE_133` | 240 x 240 | ST7789 | SPI 20 MHz | — | active low |
 | 1.54 inch square | `LB_SQUARE_154` | `SQUARE_154` | 240 x 240 | ST7789 | SPI 20 MHz | — | active low |
@@ -98,6 +103,21 @@ from it, and there is never more than one entry for a size.
 
 ## VGA 800 x 600 (ESP32-S3)
 
+> ## ⚠️ PSRAM MUST BE ENABLED
+>
+> **The VGA display will not work unless PSRAM is turned on.** The whole
+> 800 x 600 picture lives in a framebuffer in PSRAM (about 960 KB, far more
+> than the ESP32-S3's internal RAM), so with PSRAM off `begin()` returns
+> `false`, prints that the framebuffer needs PSRAM, and the monitor shows
+> nothing.
+>
+> **Arduino IDE:** Tools ▸ **PSRAM ▸ OPI PSRAM**  (the board's N16R8 module has
+> 8 MB of octal PSRAM, so *OPI*, not *QSPI*).
+> **PlatformIO:** use an `N16R8` board definition and add
+> `-DBOARD_HAS_PSRAM` and `board_build.arduino.memory_type = qio_opi`.
+>
+> Set this first. It is the most common reason a new VGA board "does nothing".
+
 **Available now.** The Lonely Binary VGA board is sold together with an
 ESP32-S3 (N16R8: 16 MB flash, 8 MB octal PSRAM). It turns 16 GPIO lines into
 the three analog colour signals of a VGA connector with a resistor ladder and
@@ -130,7 +150,7 @@ void loop() {}
 | Setting | Value | If you get it wrong |
 |---|---|---|
 | Board | **ESP32S3 Dev Module** | The pins are those of the ESP32-S3 |
-| PSRAM | **OPI PSRAM** | `begin()` returns false and says the framebuffer needs PSRAM |
+| PSRAM | **OPI PSRAM** (**required**, never "Disabled") | `begin()` returns false, says the framebuffer needs PSRAM, and the monitor stays blank |
 | USB CDC On Boot | **Disabled** | `Serial` goes to native USB and nothing appears on the UART |
 | Partition Scheme | **Huge APP** | Only the photo and LVGL examples are large enough to need it |
 
@@ -270,7 +290,10 @@ display.setSpiHz(20000000);     // before begin(); 0 restores the default
 `printInfo()` prints the pins actually in use and marks them as custom, which
 makes a wiring mistake obvious in the serial log.
 
-See **File ▸ Examples ▸ Lonely Binary Display ▸ CustomPins**.
+Every example already does this: its top lists each GPIO it uses as a
+`#define PIN_...` line, and `setup()` passes them to `setWiring()` before
+`begin()`. To match your board, change those numbers - nothing else.
+See also **File ▸ Examples ▸ Lonely Binary Display ▸ CustomPins**.
 
 ### When the colours come out wrong
 
