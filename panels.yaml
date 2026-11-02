@@ -627,6 +627,43 @@ panels:
       The vendor's rotation numbering has 0 and 2 swapped against the ST7789 family;
       rotations 1-3 have not been looked at on the glass.
 
+  - id: rtp_350
+    product: true
+    name: '3.5 inch, resistive touch'
+    family: rtp
+    driver: ST7796
+    bus: par8
+    width: 320
+    height: 480
+    rotation: 1         # ships landscape, 480 x 320 (turned right 90 degrees)
+    offsets: [0, 0, 0, 0]
+    bgr: true           # UNVERIFIED - factory MADCTL 0x48 (BGR | MX); check with RtpCheck
+    invert: false       # UNVERIFIED
+    backlight_active_low: false
+    par8:
+      data: [13, 12, 11, 10, 1, 15, 7, 4]   # D0..D7
+      wr: 42
+      dc: 41
+      rd: -1            # RD tied to 3.3 V on the module
+      cs: -1            # CS tied to GND on the module
+      rst: 2
+      backlight: -1     # not driven by the factory sketch: LEDs always on
+      touch_sda: 6
+      touch_scl: 5
+      touch_int: -1     # PENIRQ not known: judged by pressure alone
+      touch_rst: -1
+    touch:
+      controller: NS2009
+      swap_xy: false    # UNVERIFIED - RtpCheck's 4-point calibration measures it
+      flip_x: false
+      flip_y: false
+      raw: [200, 3900, 200, 3900]   # UNVERIFIED rough start; run RtpCheck
+    notes: >-
+      F-3501Z4S-E, ST7796, 8080 8-bit parallel, on its own flying-wire pins (not
+      the standard breakout). Factory init is in Basic_S3.ino; this library uses
+      its generic ST7796 table. GPIO 41/42 (DC/WR) are above 31, which the par8
+      bus handles. Touch I2C: SDA 6, SCL 5. Not yet run through this library.
+
   # ── Square LCD series, small SPI sizes (no touch) ──────────────────────────
   #
   # Same family as the 3.92 inch above, but these are ordinary SPI panels on the

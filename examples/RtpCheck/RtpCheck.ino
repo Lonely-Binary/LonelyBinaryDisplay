@@ -60,6 +60,7 @@ LB_Display display(LB_RTP_180);
 //LB_Display display(LB_RTP_240);
 //LB_Display display(LB_RTP_280);
 //LB_Display display(LB_RTP_430);
+//LB_Display display(LB_RTP_350);   // 8-bit parallel, own pins and touch (SDA 6, SCL 5) from the panel table
 
 static LB_TouchNS2009 *touch() { return static_cast<LB_TouchNS2009 *>(display.touch()); }
 
@@ -227,13 +228,15 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   delay(500);   // the panel needs a moment after power-up, or it comes up scrambled
-  LB_Wiring pins = LB_WIRING;   // keeps the SPI bus that fits this chip
-  pins.cs = PIN_CS;  pins.rst = PIN_RST;  pins.dc = PIN_DC;
-  pins.mosi = PIN_MOSI;  pins.sclk = PIN_SCLK;  pins.miso = PIN_MISO;
-  pins.backlight = PIN_BL;
-  pins.touchSda = PIN_TOUCH_SDA;  pins.touchScl = PIN_TOUCH_SCL;
-  pins.touchInt = PIN_TOUCH_INT;  pins.touchRst = PIN_TOUCH_RST;
-  display.setWiring(pins);
+  if (display.panelDef()->bus == LB_BUS_SPI) {   // a parallel panel (LB_RTP_350) carries its own pins
+    LB_Wiring pins = LB_WIRING;   // keeps the SPI bus that fits this chip
+    pins.cs = PIN_CS;  pins.rst = PIN_RST;  pins.dc = PIN_DC;
+    pins.mosi = PIN_MOSI;  pins.sclk = PIN_SCLK;  pins.miso = PIN_MISO;
+    pins.backlight = PIN_BL;
+    pins.touchSda = PIN_TOUCH_SDA;  pins.touchScl = PIN_TOUCH_SCL;
+    pins.touchInt = PIN_TOUCH_INT;  pins.touchRst = PIN_TOUCH_RST;
+    display.setWiring(pins);
+  }
 
   if (!display.begin(true)) {
     Serial.println("Display did not start. Check the ribbon cable and DC.");
