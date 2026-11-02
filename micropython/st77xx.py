@@ -88,6 +88,10 @@ class ST77xx:
     # Per-controller MADCTL quirk, XORed into every rotation's value
     # (the ST7796 scans mirrored, so its subclass sets MX here).
     _MADCTL_XOR = 0x00
+    # VCOM register and its voltage at 0x00, for the controllers that have one
+    # here (None = not adjustable). Volts = _VCOM_BASE + 0.025 * value.
+    _VCOM_CMD = None
+    _VCOM_BASE = 0.0
 
     def __init__(self, spi, width, height, dc, cs, rst=None,
                  rotation=0, bgr=False, invert=True, xstart=0, ystart=0,
@@ -181,6 +185,24 @@ class ST77xx:
         self._cmd(_INVON if self.invert else _INVOFF, None, 10)
         self._cmd(_NORON, None, 10)
         self._cmd(_DISPON, None, 120)
+
+    def vcom(self):
+        """The VCOM value in use (0x00-0x3F), or None where it is not
+        adjustable. Starts as the init table's."""
+        if self._VCOM_CMD is None:
+            return None
+        if getattr(self, "_vcom", None) is None:
+            self._vcom = next((d[0] for c, d, _ in self._INIT
+                               if c == self._VCOM_CMD and len(d) == 1), None)
+        return self._vcom
+
+    def set_vcom(self, value):
+        """Set VCOM, 0x00-0x3F. False where the controller has none here."""
+        if self._VCOM_CMD is None or not 0 <= value <= 0x3F:
+            return False
+        self._cmd(self._VCOM_CMD, bytes([value]))
+        self._vcom = value
+        return True
 
     def set_rotation(self, r):
         """Set rotation 0..3. 0 = portrait (as wired), 1 = 90 deg CW, ..."""
@@ -446,6 +468,9 @@ class ST7789(ST77xx):
     panels happen to work on power-on defaults alone, but the narrow 1.14
     inch stays black without these."""
 
+    _VCOM_CMD = 0xBB    # VCOMS: 0.1 V + 0.025 V x value
+    _VCOM_BASE = 0.1
+
     _INIT = (
         (0xB0, b"\x00\xf0", 0),                  # RAMCTRL
         (0xB2, b"\x0c\x0c\x00\x33\x33", 0),      # PORCTRL porch setting
@@ -473,6 +498,9 @@ class ST7796(ST77xx):
     # as a mirror image. This matches Arduino_GFX's rotation-0 value of 0x48.
     _MADCTL_XOR = _MADCTL_MX
 
+    _VCOM_CMD = 0xC5    # VCMPCTL: 0.5 V + 0.025 V x value
+    _VCOM_BASE = 0.5
+
     _INIT = (
         (0xF0, b"\xc3", 0),                      # CSCON unlock part 1
         (0xF0, b"\x96", 0),                      # CSCON unlock part 2
@@ -489,3 +517,15 @@ class ST7796(ST77xx):
         (0xF0, b"\x3c", 0),                      # CSCON lock part 1
         (0xF0, b"\x69", 0),                      # CSCON lock part 2
     )
+
+    def set_vcom(self, value):
+        # C5 is a command-set-2 register: written only between the unlock and
+        # the lock, as in _INIT. Outside them the write is ignored.
+        if not 0 <= value <= 0x3F:
+            return False
+        self._cmd(0xF0, b"\xc3")
+        self._cmd(0xF0, b"\x96")
+        ok = super().set_vcom(value)
+        self._cmd(0xF0, b"\x3c")
+        self._cmd(0xF0, b"\x69")
+        return ok

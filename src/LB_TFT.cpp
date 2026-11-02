@@ -64,6 +64,22 @@ static const uint8_t *initTable(const LB_PanelDef *p) {
   return nullptr;
 }
 
+// The VCOM register of the controllers that have one here, or 0 for none.
+static uint8_t vcomCmd(LB_Driver drv) {
+  if (drv == LB_DRV_ST7796) return 0xC5;  // VCMPCTL: 0.5 V + 0.025 V x n
+  if (drv == LB_DRV_ST7789) return 0xBB;  // VCOMS:   0.1 V + 0.025 V x n
+  return 0;
+}
+
+// What the init table set VCOM to, so vcom() is true before any setVcom().
+static int16_t tableVcom(LB_Driver drv, const uint8_t *t) {
+  const uint8_t c = vcomCmd(drv);
+  if (!c || !t) return -1;
+  for (; !(t[0] == 0xFF && t[1] == 0xFF); t += 3 + t[1])
+    if (t[0] == c && t[1] == 1) return t[3];
+  return -1;
+}
+
 // MADCTL (0x36) is the same register on every controller we drive, and bit 3
 // selects BGR. The rotation bits are not the same between families, so both
 // mappings are transcribed here from the Arduino_GFX drivers. This is chip
@@ -148,7 +164,10 @@ bool LB_TFT::begin(int32_t hz, bool bgr, bool invert) {
   _bgr = bgr;
   if (!_bus->begin(hz)) return false;
   reset();
-  runTable(initTable(_panel));
+  const uint8_t *table = initTable(_panel);
+  runTable(table);
+  _vcom = tableVcom(_panel->driver, table);
+  if (_panel->vcomSet) setVcom(_panel->vcom);
   setInverted(invert);
   setRotation(_panel->rotation);
   _bus->beginWrite();
@@ -186,6 +205,24 @@ void LB_TFT::runTable(const uint8_t *t) {
     t += 3 + n;
   }
   _bus->endWrite();
+}
+
+bool LB_TFT::setVcom(uint8_t value) {
+  const uint8_t c = vcomCmd(_panel->driver);
+  if (!c || value > 0x3F) return false;
+  const bool st7796 = _panel->driver == LB_DRV_ST7796;
+  // ST7796: C5 is a command-set-2 register, written only between the unlock
+  // (F0 C3, F0 96) and the lock (F0 3C, F0 69) - the same pair the init table
+  // wraps it in. Outside them the write is ignored.
+  static const uint8_t unlock[] = {0xC3, 0x96}, lock[] = {0x3C, 0x69};
+  _bus->beginWrite();
+  if (st7796) for (uint8_t b : unlock) { _bus->command(0xF0); _bus->data(&b, 1); }
+  _bus->command(c);
+  _bus->data(&value, 1);
+  if (st7796) for (uint8_t b : lock) { _bus->command(0xF0); _bus->data(&b, 1); }
+  _bus->endWrite();
+  _vcom = value;
+  return true;
 }
 
 void LB_TFT::setInverted(bool invert) {

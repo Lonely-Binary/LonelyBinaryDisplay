@@ -259,6 +259,8 @@ drawGauge(display, 42.0f);
 | `setColorOrder(order)` | `LB_Display::COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time, before or after `begin()`. |
 | `setInverted(bool)` | Set the panel's inversion. Any time, before or after `begin()`. |
 | `setBacklightActiveLow(bool)` | Flip the backlight polarity. Any time. |
+| `setVcom(uint8_t)` | The LCD's VCOM, 0x00-0x3F, for a still picture whose mid tones shimmer as if the backlight were unsteady. ST7796 (0.5 V + 0.025 V x value) and ST7789 (0.1 V + 0.025 V x value) only; returns `false` on any other controller. Any time, before or after `begin()`. The panel table already sets it where it has been measured (`LB_TFT_35`: 0x05); the `VcomTune` example finds the value for a panel by eye. |
+| `vcom()`, `vcomVolts()` | The VCOM value in use (`-1` where not adjustable) and its voltage. |
 | `panelDef()` | The panel table entry — `->name`, `->id`, `->width`, `->height`. |
 | `selfTest()` | Colour bars, backlight sweep, panel identity. The "does my wiring work" check. |
 | `printInfo()` | The same details to Serial. Ask for this output when diagnosing. |
@@ -383,8 +385,9 @@ tft.text("Hello", 10, 10, WHITE, scale=2)
 ### API
 
 `LBDisplay(panel, wiring=None, board=None)`, then `begin()`, `gfx()`,
-`backlight(0..255)`, `set_rotation(0..3)`, `width()`, `height()`, `self_test()`,
-`print_info()`. `detect_board()` returns `"esp32s3"` or `"esp32"`.
+`backlight(0..255)`, `set_vcom(0x00..0x3F)` / `vcom()` / `vcom_volts()` (ST7796
+and ST7789 only, after `begin()`), `set_rotation(0..3)`, `width()`, `height()`,
+`self_test()`, `print_info()`. `detect_board()` returns `"esp32s3"` or `"esp32"`.
 
 Drawing, on the object from `gfx()`:
 `fill(color)`, `fill_rect(x, y, w, h, color)`, `rect(...)`, `pixel(x, y, color)`,
@@ -453,6 +456,7 @@ without guessing.
 | Red shows blue, blue shows red, black is still black | Colour order | `setColorOrder(LB_Display::COLOR_BGR)` (or `COLOR_RGB`) |
 | Photo-negative — black comes out white | Inversion | `setInverted(true)` (or `false`) |
 | Red → yellow, green → magenta, blue → cyan | **Both** of the above stacked | Both calls |
+| Still picture shimmers on greys / mid tones, like an unsteady backlight; black, white and saturated colours are steady | VCOM does not suit the glass | Run the `VcomTune` example, then `setVcom(value)` after `begin()` (ST7796 / ST7789) |
 | Scrambled, torn or half-drawn image | SPI clock too high for the wiring | `setSpiHz(20000000)` before `begin()` |
 | Image drawn into a corner or shifted by a few pixels | Offsets — usually a hand-written driver setup, or a non-Lonely-Binary panel | Use the panel constant; for a foreign panel the offsets cannot be guessed |
 | UI laid out off the right edge | Hard-coded resolution on a panel that ships rotated | Use `width()` / `height()` |

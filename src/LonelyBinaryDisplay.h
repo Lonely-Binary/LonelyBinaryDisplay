@@ -163,6 +163,28 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   void setBacklightActiveLow(bool activeLow);
   bool backlightActiveLow() const { return _blActiveLow; }
 
+  // ── VCOM ─────────────────────────────────────────────────────────────────
+  //
+  // The common-electrode voltage of the LCD. When it does not suit the glass,
+  // a still picture shimmers on its mid tones - greys, skin, sky - as if the
+  // backlight were unsteady, while black, white and saturated colours look
+  // fine. The panel table carries a value where one has been measured (0x05
+  // on the 3.5 inch); everywhere else the controller's init table stands.
+  //
+  //     display.begin();
+  //     display.setVcom(0x05);     // 0x00-0x3F; examples/VcomTune finds yours
+  //
+  // ST7796: 0.5 V + 0.025 V x value (init table 0x18 = 1.1 V).
+  // ST7789: 0.1 V + 0.025 V x value (init table 0x19 = 0.725 V).
+  // Returns false on any other controller, or for a value above 0x3F. Works
+  // before begin() too (it is applied there) and at any time after.
+  bool setVcom(uint8_t value);
+  // The value in use, or -1 where the controller has none (and before begin()
+  // when neither the panel table nor setVcom() gave one).
+  int16_t vcom() const;
+  // vcom() in volts, or 0 where there is none.
+  float vcomVolts() const;
+
   // Bring up SPI, the panel and the backlight, and turn the backlight on.
   // Returns false if the panel driver refuses to start (almost always a wiring
   // fault — check DC first).
@@ -255,6 +277,7 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   LB_Wiring          _wiring = LB_WIRING;  // kit default until setWiring()
   bool               _customWiring = false;
   int32_t            _spiHzOverride = 0;
+  int16_t            _vcomOverride = -1;  // setVcom() before begin(), -1 = none
   LB_WiringPar8      _wiringPar8 = LB_WIRING_PAR8;
   LB_TFTBus         *_bus    = nullptr;
   LB_Touch          *_touch  = nullptr;
