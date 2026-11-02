@@ -57,6 +57,21 @@ def touch_of(panel) -> dict:
     return panel.get("touch") or {}
 
 
+VCOM_DRIVERS = ("ST7789", "ST7796")   # the controllers LB_TFT::setVcom() knows
+
+
+def vcom_of(panel):
+    """The panel's `vcom:` (0x00-0x3F), or None to keep the init table's."""
+    v = panel.get("vcom")
+    if v is None:
+        return None
+    if panel["driver"] not in VCOM_DRIVERS:
+        sys.exit(f"{panel['id']}: vcom is only supported on {', '.join(VCOM_DRIVERS)}")
+    if not 0 <= v <= 0x3F:
+        sys.exit(f"{panel['id']}: vcom 0x{v:02X} is outside 0x00-0x3F")
+    return v
+
+
 def const_name(panel) -> str:
     """tft_24 -> LB_TFT_24. An explicit `const:` wins, so an id can stay precise
     for device_info while the name a sketch uses stays short."""
@@ -175,6 +190,10 @@ def gen_header(doc) -> str:
         "  int16_t          touchRaw[4]; // resistive: raw x at left, right; y at top, bottom",
         "  const LB_Par8Board *par8;     // LB_BUS_PAR8 with its own pins, else nullptr",
         "  const LB_SpiBoard  *spi;      // LB_BUS_SPI with its own pins, else nullptr",
+        "  // VCOM, written after the init table (ST7796 VCMPCTL / ST7789 VCOMS).",
+        "  // vcomSet false = keep the init table's value; an older initialiser gets that.",
+        "  bool             vcomSet;",
+        "  uint8_t          vcom;",
         "};",
         "",
     ]
@@ -223,7 +242,8 @@ def gen_header(doc) -> str:
             "  {{ \"{id}\", \"{name}\", LB_DRV_{drv}, {w}, {h}, {rot}, "
             "{bgr}, {inv}, {fx}, {fy}, "
             "{o0}, {o1}, {o2}, {o3}, {hz}, "
-            "{bla}, {ops}, {bus}, LB_TOUCH_{tc}, {tsw}, {tfx}, {tfy}, {rgb}, {{{raw}}}, {par8}, {spi} }},".format(
+            "{bla}, {ops}, {bus}, LB_TOUCH_{tc}, {tsw}, {tfx}, {tfy}, {rgb}, {{{raw}}}, {par8}, {spi}, "
+            "{vset}, {vcom} }},".format(
                 id=p["id"], name=p["name"], drv=p["driver"],
                 w=p["width"], h=p["height"], rot=p["rotation"],
                 bgr=cbool(p.get("bgr")),
@@ -242,6 +262,8 @@ def gen_header(doc) -> str:
                 raw=", ".join(map(str, touch_of(p).get("raw", [0, 0, 0, 0]))),
                 par8=f"&LB_PAR8_{p['id'].upper()}" if "par8" in p else "nullptr",
                 spi=f"&LB_SPI_{p['id'].upper()}" if "spi" in p else "nullptr",
+                vset=cbool(vcom_of(p) is not None),
+                vcom=f"0x{vcom_of(p) or 0:02X}",
             )
         )
     L += ["};", "", f"#define LB_PANEL_COUNT {len(panels)}", ""]
@@ -390,6 +412,7 @@ def gen_python(doc) -> str:
             f'    "flip_y": {bool(p.get("flip_y"))},',
             f'    "baudrate": {p["spi_hz"]},',
             f'    "bl_active_low": {bool(p["backlight_active_low"])},',
+            f'    "vcom": {"None" if vcom_of(p) is None else f"0x{vcom_of(p):02X}"},',
             "}",
             "",
         ]

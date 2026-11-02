@@ -350,6 +350,33 @@ If you find a wrong value for a panel **we sell**, please tell us rather than
 working around it in your sketch — it belongs in `panels.yaml`, where both the
 Arduino and MicroPython sides pick it up.
 
+### When a still picture shimmers (VCOM)
+
+If grey, skin-tone or mid-blue areas of a still picture seem to flicker, as if
+the backlight were unsteady, while black, white and saturated colours look
+fine, the panel's VCOM (common-electrode voltage) does not suit that glass.
+It is one register on the ST7796 (3.5 inch) and ST7789 panels:
+
+```cpp
+display.begin();
+display.setVcom(0x05);   // 0x00-0x3F
+```
+
+| Controller | Volts | Init table |
+|---|---|---|
+| ST7796 | 0.5 V + 0.025 V x value | 0x18 = 1.1 V |
+| ST7789 | 0.1 V + 0.025 V x value | 0x19 = 0.725 V |
+
+`LB_TFT_35` already ships with 0x05 (0.625 V), from `vcom:` in its
+`panels.yaml` entry; every other panel keeps its controller's init value.
+**File ▸ Examples ▸ Lonely Binary Display ▸ VcomTune** shows the patterns where
+the shimmer is easiest to see (mid tones solid, in 1-pixel checks and stripes,
+a grey ramp) and lets you step VCOM from the Serial Monitor (`+` / `-`, a
+number to jump, `s` for the line to paste) or the BOOT button. Put the value it
+finds in `setVcom()` after `begin()`, or in the panel's `vcom:` in
+`panels.yaml`. `vcom()` / `vcomVolts()` read it back, and `printInfo()`
+reports it.
+
 ### API
 
 | | |
@@ -365,6 +392,7 @@ Arduino and MicroPython sides pick it up.
 | `setColorOrder(order)` | `COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time. |
 | `setInverted(bool)` | Set the panel's inversion. Any time. |
 | `setBacklightActiveLow(bool)` | Flip the backlight polarity. Any time. |
+| `setVcom(0x00..0x3F)` | The LCD's VCOM, for a picture that shimmers on mid tones. ST7796 and ST7789 only (`false` elsewhere). Any time. `vcom()` reads it back (`-1` = not adjustable), `vcomVolts()` in volts. See `VcomTune`. |
 | `setRotation(0..3)` | Applies the correct offset pair for portrait vs landscape. With a framebuffer, only 0 ↔ 2 or 1 ↔ 3 (the buffer keeps its shape). |
 | `width()` / `height()` | Current size, rotation included. |
 | `selfTest()` | Colour bars, backlight sweep, panel identity. |
@@ -522,7 +550,8 @@ d.begin()
 ```
 
 The setup calls mirror the Arduino ones: `begin()`, `backlight()`,
-`set_rotation()`, `width()`, `height()`, `self_test()`, `print_info()`. Drawing
+`set_vcom()` / `vcom()` (after `begin()`; or `panel["vcom"]` on a copy of the
+panel dict), `set_rotation()`, `width()`, `height()`, `self_test()`, `print_info()`. Drawing
 is different for now: on MicroPython it is on the object `gfx()` returns, not
 on the display itself.
 

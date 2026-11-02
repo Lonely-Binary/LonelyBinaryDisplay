@@ -45,6 +45,30 @@ void LB_Display::setWiring(const LB_WiringPar8 &wiring) {
   _customWiring = true;
 }
 
+static bool hasVcom(const LB_PanelDef *p) {
+  return p->bus != LB_BUS_RGB && (p->driver == LB_DRV_ST7796 || p->driver == LB_DRV_ST7789);
+}
+
+bool LB_Display::setVcom(uint8_t value) {
+  if (!hasVcom(_panel) || value > 0x3F) return false;
+  if (_tft && !_tft->setVcom(value)) return false;
+  _vcomOverride = value;   // before begin(), begin() sends it
+  return true;
+}
+
+int16_t LB_Display::vcom() const {
+  if (_tft) return _tft->vcom();
+  if (!hasVcom(_panel)) return -1;
+  if (_vcomOverride >= 0) return _vcomOverride;
+  return _panel->vcomSet ? _panel->vcom : -1;
+}
+
+float LB_Display::vcomVolts() const {
+  const int16_t v = vcom();
+  if (v < 0) return 0;
+  return (_panel->driver == LB_DRV_ST7796 ? 0.5f : 0.1f) + 0.025f * v;
+}
+
 bool LB_Display::begin(bool useCanvas) {
   if (_tft) return true;  // already up
 
@@ -86,6 +110,9 @@ bool LB_Display::begin(bool useCanvas) {
     _bus = nullptr;
     return false;
   }
+
+  // After the panel's own VCOM (applied in LB_TFT::begin), so a sketch's wins.
+  if (_vcomOverride >= 0) _tft->setVcom((uint8_t)_vcomOverride);
 
   if (_tft->framebuffer()) {
     // An RGB panel cannot exist without a framebuffer, so there is always a
@@ -293,6 +320,9 @@ void LB_Display::printInfo(Print &out) const {
              _colorOrder == COLOR_AUTO ? "" : " (forced)",
              _inverted ? "" : "not ",
              _inverted == _panel->invert ? "" : " (forced)");
+  if (vcom() >= 0)
+    out.printf("VCOM       : 0x%02X (%.3f V)%s\n", vcom(), vcomVolts(),
+               _vcomOverride >= 0 ? "  (set by sketch)" : _panel->vcomSet ? "  (panel table)" : "");
   out.printf("Framebuffer: %s%s\n", !_fb ? "no (direct)"
                                    : _fbInPsram ? "yes (PSRAM)" : "yes (internal RAM)",
              framebuffer2() ? ", double buffered" : "");

@@ -107,6 +107,11 @@ class LBDisplay:
         else:
             self.tft = getattr(st77xx, cls)(self.spi, **kw)
 
+        # VCOM from the panel table, after the init sequence. None keeps the
+        # controller's own (see set_vcom()).
+        if p.get("vcom") is not None:
+            self.tft.set_vcom(p["vcom"])
+
         self._backlight_begin()
         self.backlight(255)
         return self.tft
@@ -135,6 +140,25 @@ class LBDisplay:
         duty = 255 - level if self.panel["bl_active_low"] else level
         self._pwm.duty_u16(duty * 257)
 
+    # -- VCOM ----------------------------------------------------------------
+
+    def set_vcom(self, value):
+        """The LCD's common-electrode voltage, 0x00-0x3F. A value that does
+        not suit the glass makes mid tones of a still picture shimmer as if the
+        backlight were unsteady. ST7796: 0.5 V + 0.025 V x value, ST7789:
+        0.1 V + 0.025 V x value. False on any other controller. After begin();
+        or put it on a copy of the panel dict as "vcom" before."""
+        return bool(self.tft and hasattr(self.tft, "set_vcom")
+                    and self.tft.set_vcom(value))
+
+    def vcom(self):
+        """The VCOM value in use, or None where it is not adjustable."""
+        return self.tft.vcom() if self.tft and hasattr(self.tft, "vcom") else None
+
+    def vcom_volts(self):
+        v = self.vcom()
+        return None if v is None else self.tft._VCOM_BASE + 0.025 * v
+
     # -- geometry ------------------------------------------------------------
 
     def set_rotation(self, r):
@@ -158,6 +182,8 @@ class LBDisplay:
         print("SPI clock  : {} Hz  (SPI{})".format(p["baudrate"], w["spi_id"]))
         print("Backlight  : PWM, active {}".format(
             "LOW" if p["bl_active_low"] else "HIGH"))
+        if self.vcom() is not None:
+            print("VCOM       : 0x{:02X} ({:.3f} V)".format(self.vcom(), self.vcom_volts()))
         print("Board      : {}{}".format(
             self.board, "  (custom wiring)" if self.custom_wiring else ""))
         print("Pins       : CS={} RST={} DC={} MOSI={} SCLK={} BL={}".format(

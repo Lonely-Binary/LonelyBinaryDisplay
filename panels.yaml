@@ -236,6 +236,13 @@ panels:
     invert: true
     spi_hz: 40000000
     backlight_active_low: false
+    # VCOM (ST7796 VCMPCTL, C5) = 0.5 V + 0.025 V x n. The shared ST7796 table
+    # sends 0x18 (1.1 V); at that, full-screen photos shimmer on mid tones like
+    # an unsteady backlight. 0x05 (0.625 V) was clearly steadier on the 3.5 inch
+    # glass, judged by eye on the FloppyDisk board (2026-11); re-check one with
+    # examples/VcomTune. Optional per panel: without it the init table's value
+    # stands.
+    vcom: 0x05
 
   # ── Narrow LCD series (strip format, landscape, PWM backlight) ─────────────
   - id: narrow_114

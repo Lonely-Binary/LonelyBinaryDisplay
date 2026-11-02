@@ -24,6 +24,7 @@ TFT_096 = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 TFT_18 = {
@@ -41,6 +42,7 @@ TFT_18 = {
     "flip_y": True,
     "baudrate": 20000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 TFT_20 = {
@@ -58,6 +60,7 @@ TFT_20 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 TFT_24 = {
@@ -75,6 +78,7 @@ TFT_24 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 TFT_28 = {
@@ -92,6 +96,7 @@ TFT_28 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 TFT_35 = {
@@ -109,6 +114,7 @@ TFT_35 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": False,
+    "vcom": 0x05,
 }
 
 NARROW_114 = {
@@ -126,6 +132,7 @@ NARROW_114 = {
     "flip_y": False,
     "baudrate": 8000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 NARROW_168 = {
@@ -143,6 +150,7 @@ NARROW_168 = {
     "flip_y": False,
     "baudrate": 8000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 NARROW_19 = {
@@ -160,6 +168,7 @@ NARROW_19 = {
     "flip_y": False,
     "baudrate": 8000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 NARROW_225 = {
@@ -177,6 +186,7 @@ NARROW_225 = {
     "flip_y": False,
     "baudrate": 8000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 NARROW_279 = {
@@ -194,6 +204,7 @@ NARROW_279 = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 TAP_128_CTP = {
@@ -211,6 +222,7 @@ TAP_128_CTP = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 TAP_150_CTP = {
@@ -228,6 +240,7 @@ TAP_150_CTP = {
     "flip_y": False,
     "baudrate": 10000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 RLCD_213 = {
@@ -245,6 +258,7 @@ RLCD_213 = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 RLCD_290 = {
@@ -262,6 +276,7 @@ RLCD_290 = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 RLCD_420 = {
@@ -279,6 +294,7 @@ RLCD_420 = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 RTP_180 = {
@@ -296,6 +312,7 @@ RTP_180 = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 RTP_240 = {
@@ -313,6 +330,7 @@ RTP_240 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 RTP_280 = {
@@ -330,6 +348,7 @@ RTP_280 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 RTP_430 = {
@@ -347,6 +366,7 @@ RTP_430 = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 SQUARE_085 = {
@@ -364,6 +384,7 @@ SQUARE_085 = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 SQUARE_133 = {
@@ -381,6 +402,7 @@ SQUARE_133 = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 SQUARE_154 = {
@@ -398,6 +420,7 @@ SQUARE_154 = {
     "flip_y": False,
     "baudrate": 20000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 SQUARE_200 = {
@@ -415,6 +438,7 @@ SQUARE_200 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 SQUARE_231 = {
@@ -432,6 +456,7 @@ SQUARE_231 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": True,
+    "vcom": None,
 }
 
 SQUARE_392 = {
@@ -449,6 +474,7 @@ SQUARE_392 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 ILI9341_240X320 = {
@@ -466,6 +492,7 @@ ILI9341_240X320 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 ILI9341_320X240 = {
@@ -483,6 +510,7 @@ ILI9341_320X240 = {
     "flip_y": False,
     "baudrate": 40000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 ST7305_400X300 = {
@@ -500,6 +528,7 @@ ST7305_400X300 = {
     "flip_y": False,
     "baudrate": 10000000,
     "bl_active_low": False,
+    "vcom": None,
 }
 
 # Panels Lonely Binary sells.

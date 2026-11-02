@@ -134,6 +134,11 @@ public:
   /* The reflective LCD's low-power mode: a few microamps and a slower refresh.
    * Nothing to do on any other panel. */
   virtual void setLowPower(bool low) { (void)low; }
+
+  /* VCOM, the common-electrode voltage: 0x00-0x3F. False on a controller
+   * that has no such register here; vcom() is then -1. */
+  virtual bool setVcom(uint8_t value) { (void)value; return false; }
+  virtual int16_t vcom() const { return -1; }
 };
 
 class LB_TFT : public LB_Screen
@@ -149,6 +154,10 @@ public:
   void setRotation(uint8_t r) override;   /* 0-3 */
   void setColorOrder(bool bgr) override;  /* rewrites MADCTL; works at any time */
   void setInverted(bool invert) override;
+  /* ST7796 VCMPCTL (C5, inside the command-set-2 unlock) and ST7789 VCOMS
+   * (BB). Works at any time; the next reset brings the panel's value back. */
+  bool setVcom(uint8_t value) override;
+  int16_t vcom() const override { return _vcom; }
 
   int16_t width() const override { return _w; }
   int16_t height() const override { return _h; }
@@ -166,6 +175,7 @@ private:
   bool _bgr = false;
   uint8_t _rotation = 0;
   bool _mirrorX = false, _mirrorY = false;   /* software mirror, see setRotation() */
+  int16_t _vcom = -1;                        /* last VCOM sent, -1 = no VCOM register */
   int16_t _w = 0, _h = 0;
   int16_t _xStart = 0, _yStart = 0;
   /* Last window sent. 0xFFFF never matches, so the next window goes out in
