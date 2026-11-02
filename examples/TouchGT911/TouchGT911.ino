@@ -16,7 +16,14 @@
 */
 #include <LB_TouchGT911.h>
 
-LB_TouchGT911 touch(21 /* SDA */, 22 /* SCL */, 18 /* INT */, 19 /* RST */);
+// ---- GPIO wiring. Every pin this sketch uses is here - change the numbers to match
+// ---- your board; nothing below refers to a GPIO by number. -1 = not connected.
+#define PIN_TOUCH_SDA  21
+#define PIN_TOUCH_SCL  22
+#define PIN_TOUCH_INT  18
+#define PIN_TOUCH_RST  19
+
+LB_TouchGT911 touch(PIN_TOUCH_SDA, PIN_TOUCH_SCL, PIN_TOUCH_INT, PIN_TOUCH_RST);
 
 void setup() {
   Serial.begin(115200);

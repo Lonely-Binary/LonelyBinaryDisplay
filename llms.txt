@@ -121,12 +121,16 @@ hand.
 | 2.4 inch, resistive touch | `LB_RTP_240` | `RTP_240` | 320 x 240 | ST7789 | SPI 40 MHz | NS2009 (resistive) | active low |
 | 2.8 inch, resistive touch | `LB_RTP_280` | `RTP_280` | 320 x 240 | ST7789 | SPI 40 MHz | NS2009 (resistive) | active low |
 | 4.3 inch, resistive touch | `LB_RTP_430` | not supported | 480 x 272 | NV3041A | SPI 20 MHz | NS2009 (resistive) | active low |
+| 3.5 inch, resistive touch | `LB_RTP_350` | not supported | 480 x 320 | ST7796 | 8-bit parallel | NS2009 (resistive) | active high |
 | 0.85 inch square | `LB_SQUARE_085` | `SQUARE_085` | 128 x 128 | ST7735 | SPI 20 MHz | — | active low |
 | 1.33 inch square | `LB_SQUARE_133` | `SQUARE_133` | 240 x 240 | ST7789 | SPI 20 MHz | — | active low |
 | 1.54 inch square | `LB_SQUARE_154` | `SQUARE_154` | 240 x 240 | ST7789 | SPI 20 MHz | — | active low |
 | 2.0 inch square | `LB_SQUARE_200` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 2.31 inch square | `LB_SQUARE_231` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 3.92 inch square | `LB_SQUARE_392` | `SQUARE_392` | 320 x 320 | ST7796 | SPI 40 MHz | — | active high |
+| 4.3 inch RGB | `LB_RGB_430_480X272` | not supported | 480 x 272 | RGB | 16-bit RGB (S3 only) | — | active high |
+| 7 inch RGB | `LB_RGB_700_1024X600` | not supported | 1024 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
+| 10.1 inch RGB | `LB_RGB_1010_1024X600` | not supported | 1024 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 | Lonely Binary ESP32-S3 VGA 800x600 | `LB_VGA_800X600` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 
 **Screen size is the size after the panel's default rotation**, which is
@@ -144,6 +148,7 @@ transpose of the raw glass:
 - `LB_RTP_180` — glass is 128 x 160, ships at rotation 1, so you get 160 x 128
 - `LB_RTP_240` — glass is 240 x 320, ships at rotation 1, so you get 320 x 240
 - `LB_RTP_280` — glass is 240 x 320, ships at rotation 1, so you get 320 x 240
+- `LB_RTP_350` — glass is 320 x 480, ships at rotation 1, so you get 480 x 320
 - `LB_ILI9327_400X240` — glass is 240 x 400, ships at rotation 1, so you get 400 x 240
 - `LB_ILI9486_480X320` — glass is 320 x 480, ships at rotation 3, so you get 480 x 320
 - `LB_ILI9341_320X240` — glass is 240 x 320, ships at rotation 1, so you get 320 x 240

@@ -99,11 +99,15 @@ struct LB_PanelDef {
   uint8_t          vcom;
 };
 
+static const LB_RgbBoard LB_RGB_RGB_430_480X272 = { 9000000, 4, 43, 8, 4, 12, 8, true, 42, -1, -1, 41, 14, {8, 18, 17, 16, 15, 13, 12, 11, 10, 9, 3, 40, 39, 38, 45, 21}, -1, -1, -1, -1, -1, -1, -1, -1, false, false };
+static const LB_RgbBoard LB_RGB_RGB_700_1024X600 = { 30000000, 10, 160, 20, 2, 10, 5, true, 42, -1, -1, 41, 14, {8, 18, 17, 16, 15, 13, 12, 11, 10, 9, 3, 40, 39, 38, 45, 21}, -1, -1, -1, -1, -1, -1, -1, -1, false, false };
+static const LB_RgbBoard LB_RGB_RGB_1010_1024X600 = { 30000000, 10, 160, 20, 2, 10, 5, true, 42, -1, -1, 41, 14, {8, 18, 17, 16, 15, 13, 12, 11, 10, 9, 3, 40, 39, 38, 45, 21}, -1, -1, -1, -1, -1, -1, -1, -1, false, false };
 static const LB_RgbBoard LB_RGB_SUNTON_4827S043R = { 10000000, 4, 43, 8, 4, 12, 8, true, 40, 41, 39, 42, 2, {8, 3, 46, 9, 1, 5, 6, 7, 15, 16, 4, 45, 48, 47, 21, 14}, -1, -1, 18, -1, 12, 13, 11, 38, true, true };
 static const LB_RgbBoard LB_RGB_SUNTON_8048S070C = { 12500000, 30, 16, 210, 13, 10, 22, true, 41, 40, 39, 42, 2, {15, 7, 6, 5, 4, 9, 46, 3, 8, 16, 1, 14, 21, 47, 48, 45}, 19, 20, -1, 38, -1, -1, -1, -1, false, false };
 static const LB_RgbBoard LB_RGB_VGA_800X600 = { 32000000, 72, 128, 24, 2, 22, 1, false, -1, 1, 2, -1, -1, {11, 12, 13, 14, 21, 17, 18, 8, 3, 9, 10, 7, 15, 16, 38, 39}, -1, -1, -1, -1, -1, -1, -1, -1, false, false };
 static const LB_SpiBoard LB_SPI_ILI9486_480X320 = { 16, -1, 0, 23, 19, 18, 2, 15, 4 };
 static const LB_Par8Board LB_PAR8_TAP_196_CTP = { {5, 6, 4, 7, 15, 1, 10, 11}, 2, 42, -1, 41, -1, -1, 13, 12, -1, -1 };
+static const LB_Par8Board LB_PAR8_RTP_350 = { {13, 12, 11, 10, 1, 15, 7, 4}, 42, 41, -1, -1, 2, -1, 6, 5, -1, -1 };
 static const LB_Par8Board LB_PAR8_ILI9327_400X240 = { {14, 12, 13, 15, 2, 4, 16, 17}, 33, 27, 5, 26, 18, 32, -1, -1, -1, -1 };
 
 static const LB_PanelDef LB_PANELS[] = {
@@ -129,12 +133,16 @@ static const LB_PanelDef LB_PANELS[] = {
   { "rtp_240", "2.4 inch, resistive touch", LB_DRV_ST7789, 240, 320, 1, false, false, false, false, 0, 0, 0, 0, 40000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NS2009, false, false, false, nullptr, {189, 3796, 169, 3720}, nullptr, nullptr, false, 0x00 },
   { "rtp_280", "2.8 inch, resistive touch", LB_DRV_ST7789, 240, 320, 1, false, false, false, false, 0, 0, 0, 0, 40000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NS2009, false, false, false, nullptr, {321, 3786, 163, 3284}, nullptr, nullptr, false, 0x00 },
   { "rtp_430", "4.3 inch, resistive touch", LB_DRV_NV3041A, 480, 272, 0, false, false, false, false, 0, 0, 0, 0, 20000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NS2009, false, false, false, nullptr, {150, 3943, 3674, 194}, nullptr, nullptr, false, 0x00 },
+  { "rtp_350", "3.5 inch, resistive touch", LB_DRV_ST7796, 320, 480, 1, true, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_PAR8, LB_TOUCH_NS2009, false, false, false, nullptr, {200, 3900, 200, 3900}, &LB_PAR8_RTP_350, nullptr, false, 0x00 },
   { "square_085", "0.85 inch square", LB_DRV_ST7735, 128, 128, 0, true, true, false, false, 2, 3, 2, 1, 20000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
   { "square_133", "1.33 inch square", LB_DRV_ST7789, 240, 240, 0, false, true, false, false, 0, 0, 0, 80, 20000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
   { "square_154", "1.54 inch square", LB_DRV_ST7789, 240, 240, 0, false, true, false, false, 0, 0, 0, 80, 20000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
   { "square_200", "2.0 inch square", LB_DRV_ILI9342, 320, 240, 2, true, true, false, false, 0, 0, 0, 0, 40000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
   { "square_231", "2.31 inch square", LB_DRV_ILI9342, 320, 240, 2, true, false, false, false, 0, 0, 0, 0, 40000000, true, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
   { "square_392", "3.92 inch square", LB_DRV_ST7796, 320, 320, 0, true, true, false, false, 0, 0, 0, 160, 40000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
+  { "rgb_430_480x272", "4.3 inch RGB", LB_DRV_RGB, 480, 272, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_NONE, false, false, false, &LB_RGB_RGB_430_480X272, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
+  { "rgb_700_1024x600", "7 inch RGB", LB_DRV_RGB, 1024, 600, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_NONE, false, false, false, &LB_RGB_RGB_700_1024X600, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
+  { "rgb_1010_1024x600", "10.1 inch RGB", LB_DRV_RGB, 1024, 600, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_NONE, false, false, false, &LB_RGB_RGB_1010_1024X600, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
   { "sunton_4827s043r", "Sunton ESP32-4827S043R", LB_DRV_RGB, 480, 272, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_XPT2046, false, false, false, &LB_RGB_SUNTON_4827S043R, {188, 3951, 254, 3791}, nullptr, nullptr, false, 0x00 },
   { "sunton_8048s070c", "Sunton ESP32-8048S070C", LB_DRV_RGB, 800, 480, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_GT911, false, false, false, &LB_RGB_SUNTON_8048S070C, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
   { "vga_800x600", "Lonely Binary ESP32-S3 VGA 800x600", LB_DRV_RGB, 800, 600, 0, false, false, false, false, 0, 0, 0, 0, 0, false, LB_INIT_NONE, LB_BUS_RGB, LB_TOUCH_NONE, false, false, false, &LB_RGB_VGA_800X600, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
@@ -145,49 +153,53 @@ static const LB_PanelDef LB_PANELS[] = {
   { "st7305_400x300", "ST7305 400x300 RLCD", LB_DRV_ST7305, 400, 300, 0, false, true, false, false, 0, 0, 0, 0, 10000000, false, LB_INIT_NONE, LB_BUS_SPI, LB_TOUCH_NONE, false, false, false, nullptr, {0, 0, 0, 0}, nullptr, nullptr, false, 0x00 },
 };
 
-#define LB_PANEL_COUNT 36
+#define LB_PANEL_COUNT 40
 
 // Pass one of these to LB_Display. Changing this constant is the only
 // edit needed to swap panels — everything else is inherited.
 
 // ── Lonely Binary panels ─────────────────────────────────────
-#define LB_TFT_096          (&LB_PANELS[0])   // 0.96 inch 80x160 ST7735
-#define LB_TFT_18           (&LB_PANELS[1])   // 1.8 inch 128x160 ST7735
-#define LB_TFT_20           (&LB_PANELS[2])   // 2.0 inch 240x320 ST7789
-#define LB_TFT_24           (&LB_PANELS[3])   // 2.4 inch 240x320 ST7789
-#define LB_TFT_28           (&LB_PANELS[4])   // 2.8 inch 240x320 ST7789
-#define LB_TFT_35           (&LB_PANELS[5])   // 3.5 inch 320x480 ST7796
-#define LB_NARROW_114       (&LB_PANELS[6])   // 1.14 inch 135x240 ST7789
-#define LB_NARROW_168       (&LB_PANELS[7])   // 1.68 inch 142x428 NV3007
-#define LB_NARROW_19        (&LB_PANELS[8])   // 1.9 inch 170x320 ST7789
-#define LB_NARROW_225       (&LB_PANELS[9])   // 2.25 inch 76x284 ST7789
-#define LB_NARROW_279       (&LB_PANELS[10])   // 2.79 inch 142x428 NV3007
-#define LB_SQUARE_392_CTP   (&LB_PANELS[11])   // 3.92 inch square, capacitive touch 320x320 ILI9488
-#define LB_TAP_128_CTP      (&LB_PANELS[12])   // 1.28 inch round, capacitive touch 240x240 GC9A01
-#define LB_TAP_150_CTP      (&LB_PANELS[13])   // 1.5 inch, capacitive touch 240x320 GC9306
-#define LB_TAP_196_CTP      (&LB_PANELS[14])   // 1.96 inch, capacitive touch 240x296 GC9307
-#define LB_RLCD_213         (&LB_PANELS[15])   // 2.13 inch reflective LCD 122x250 ST7305
-#define LB_RLCD_290         (&LB_PANELS[16])   // 2.9 inch reflective LCD 168x384 ST7305
-#define LB_RLCD_420         (&LB_PANELS[17])   // 4.2 inch reflective LCD 400x300 ST7305
-#define LB_RTP_180          (&LB_PANELS[18])   // 1.8 inch, resistive touch 128x160 ST7735
-#define LB_RTP_240          (&LB_PANELS[19])   // 2.4 inch, resistive touch 240x320 ST7789
-#define LB_RTP_280          (&LB_PANELS[20])   // 2.8 inch, resistive touch 240x320 ST7789
-#define LB_RTP_430          (&LB_PANELS[21])   // 4.3 inch, resistive touch 480x272 NV3041A
-#define LB_SQUARE_085       (&LB_PANELS[22])   // 0.85 inch square 128x128 ST7735
-#define LB_SQUARE_133       (&LB_PANELS[23])   // 1.33 inch square 240x240 ST7789
-#define LB_SQUARE_154       (&LB_PANELS[24])   // 1.54 inch square 240x240 ST7789
-#define LB_SQUARE_200       (&LB_PANELS[25])   // 2.0 inch square 320x240 ILI9342
-#define LB_SQUARE_231       (&LB_PANELS[26])   // 2.31 inch square 320x240 ILI9342
-#define LB_SQUARE_392       (&LB_PANELS[27])   // 3.92 inch square 320x320 ST7796
-#define LB_VGA_800X600      (&LB_PANELS[30])   // Lonely Binary ESP32-S3 VGA 800x600 800x600 RGB
+#define LB_TFT_096           (&LB_PANELS[0])   // 0.96 inch 80x160 ST7735
+#define LB_TFT_18            (&LB_PANELS[1])   // 1.8 inch 128x160 ST7735
+#define LB_TFT_20            (&LB_PANELS[2])   // 2.0 inch 240x320 ST7789
+#define LB_TFT_24            (&LB_PANELS[3])   // 2.4 inch 240x320 ST7789
+#define LB_TFT_28            (&LB_PANELS[4])   // 2.8 inch 240x320 ST7789
+#define LB_TFT_35            (&LB_PANELS[5])   // 3.5 inch 320x480 ST7796
+#define LB_NARROW_114        (&LB_PANELS[6])   // 1.14 inch 135x240 ST7789
+#define LB_NARROW_168        (&LB_PANELS[7])   // 1.68 inch 142x428 NV3007
+#define LB_NARROW_19         (&LB_PANELS[8])   // 1.9 inch 170x320 ST7789
+#define LB_NARROW_225        (&LB_PANELS[9])   // 2.25 inch 76x284 ST7789
+#define LB_NARROW_279        (&LB_PANELS[10])   // 2.79 inch 142x428 NV3007
+#define LB_SQUARE_392_CTP    (&LB_PANELS[11])   // 3.92 inch square, capacitive touch 320x320 ILI9488
+#define LB_TAP_128_CTP       (&LB_PANELS[12])   // 1.28 inch round, capacitive touch 240x240 GC9A01
+#define LB_TAP_150_CTP       (&LB_PANELS[13])   // 1.5 inch, capacitive touch 240x320 GC9306
+#define LB_TAP_196_CTP       (&LB_PANELS[14])   // 1.96 inch, capacitive touch 240x296 GC9307
+#define LB_RLCD_213          (&LB_PANELS[15])   // 2.13 inch reflective LCD 122x250 ST7305
+#define LB_RLCD_290          (&LB_PANELS[16])   // 2.9 inch reflective LCD 168x384 ST7305
+#define LB_RLCD_420          (&LB_PANELS[17])   // 4.2 inch reflective LCD 400x300 ST7305
+#define LB_RTP_180           (&LB_PANELS[18])   // 1.8 inch, resistive touch 128x160 ST7735
+#define LB_RTP_240           (&LB_PANELS[19])   // 2.4 inch, resistive touch 240x320 ST7789
+#define LB_RTP_280           (&LB_PANELS[20])   // 2.8 inch, resistive touch 240x320 ST7789
+#define LB_RTP_430           (&LB_PANELS[21])   // 4.3 inch, resistive touch 480x272 NV3041A
+#define LB_RTP_350           (&LB_PANELS[22])   // 3.5 inch, resistive touch 320x480 ST7796
+#define LB_SQUARE_085        (&LB_PANELS[23])   // 0.85 inch square 128x128 ST7735
+#define LB_SQUARE_133        (&LB_PANELS[24])   // 1.33 inch square 240x240 ST7789
+#define LB_SQUARE_154        (&LB_PANELS[25])   // 1.54 inch square 240x240 ST7789
+#define LB_SQUARE_200        (&LB_PANELS[26])   // 2.0 inch square 320x240 ILI9342
+#define LB_SQUARE_231        (&LB_PANELS[27])   // 2.31 inch square 320x240 ILI9342
+#define LB_SQUARE_392        (&LB_PANELS[28])   // 3.92 inch square 320x320 ST7796
+#define LB_RGB_430_480X272   (&LB_PANELS[29])   // 4.3 inch RGB 480x272 RGB
+#define LB_RGB_700_1024X600  (&LB_PANELS[30])   // 7 inch RGB 1024x600 RGB
+#define LB_RGB_1010_1024X600 (&LB_PANELS[31])   // 10.1 inch RGB 1024x600 RGB
+#define LB_VGA_800X600       (&LB_PANELS[34])   // Lonely Binary ESP32-S3 VGA 800x600 800x600 RGB
 
 // ── Panels we do not sell, but can drive ─────────────────────
 // Named by controller, not by size, so they cannot be confused with
 // the products above. If you bought a display from us it is up there.
-#define LB_SUNTON_4827S043R (&LB_PANELS[28])   // RGB 480x272
-#define LB_SUNTON_8048S070C (&LB_PANELS[29])   // RGB 800x480
-#define LB_ILI9341_240X320  (&LB_PANELS[31])   // ILI9341 240x320
-#define LB_ILI9327_400X240  (&LB_PANELS[32])   // ILI9327 240x400
-#define LB_ILI9486_480X320  (&LB_PANELS[33])   // ILI9486 320x480
-#define LB_ILI9341_320X240  (&LB_PANELS[34])   // ILI9341 240x320
-#define LB_ST7305_400X300   (&LB_PANELS[35])   // ST7305 400x300
+#define LB_SUNTON_4827S043R  (&LB_PANELS[32])   // RGB 480x272
+#define LB_SUNTON_8048S070C  (&LB_PANELS[33])   // RGB 800x480
+#define LB_ILI9341_240X320   (&LB_PANELS[35])   // ILI9341 240x320
+#define LB_ILI9327_400X240   (&LB_PANELS[36])   // ILI9327 240x400
+#define LB_ILI9486_480X320   (&LB_PANELS[37])   // ILI9486 320x480
+#define LB_ILI9341_320X240   (&LB_PANELS[38])   // ILI9341 240x320
+#define LB_ST7305_400X300    (&LB_PANELS[39])   // ST7305 400x300

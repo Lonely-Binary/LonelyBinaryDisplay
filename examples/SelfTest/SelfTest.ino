@@ -17,6 +17,26 @@
 */
 #include <LonelyBinaryDisplay.h>
 
+// ---- GPIO wiring. Every pin this sketch uses is here - change the numbers to match
+// ---- your board; nothing below refers to a GPIO by number. -1 = not connected.
+#if CONFIG_IDF_TARGET_ESP32S3   // ESP32-S3 (Lonely Binary kit)
+  #define PIN_CS    10
+  #define PIN_RST   42
+  #define PIN_DC     2
+  #define PIN_MOSI  11
+  #define PIN_SCLK  12
+  #define PIN_MISO  -1   // not used by the display
+  #define PIN_BL    41   // backlight (PWM)
+#else                           // classic ESP32
+  #define PIN_CS    15
+  #define PIN_RST    4
+  #define PIN_DC     2
+  #define PIN_MOSI  23
+  #define PIN_SCLK  18
+  #define PIN_MISO  -1   // not used by the display
+  #define PIN_BL    32   // backlight (PWM)
+#endif
+
 LB_Display display(LB_TFT_24);
 //LB_Display display(LB_TFT_096);
 //LB_Display display(LB_TFT_18);
@@ -32,6 +52,12 @@ LB_Display display(LB_TFT_24);
 void setup() {
   Serial.begin(115200);
   delay(500);
+
+  LB_Wiring pins = LB_WIRING;   // keeps the SPI bus that fits this chip
+  pins.cs = PIN_CS;  pins.rst = PIN_RST;  pins.dc = PIN_DC;
+  pins.mosi = PIN_MOSI;  pins.sclk = PIN_SCLK;  pins.miso = PIN_MISO;
+  pins.backlight = PIN_BL;
+  display.setWiring(pins);
 
   if (!display.begin()) {
     Serial.println("Display did not start. Check the ribbon cable and DC.");

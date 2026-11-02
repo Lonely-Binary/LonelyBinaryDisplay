@@ -25,6 +25,34 @@
 #include <LB_TouchCalibration.h>
 #include <Preferences.h>
 
+// ---- GPIO wiring. Every pin this sketch uses is here - change the numbers to match
+// ---- your board; nothing below refers to a GPIO by number. -1 = not connected.
+#if CONFIG_IDF_TARGET_ESP32S3   // ESP32-S3 (Lonely Binary kit)
+  #define PIN_CS         10
+  #define PIN_RST        42
+  #define PIN_DC          2
+  #define PIN_MOSI       11
+  #define PIN_SCLK       12
+  #define PIN_MISO       -1   // not used by the display
+  #define PIN_BL         41   // backlight (PWM)
+  #define PIN_TOUCH_SDA   4   // I2C touch
+  #define PIN_TOUCH_SCL   6
+  #define PIN_TOUCH_INT   5
+  #define PIN_TOUCH_RST   7
+#else                           // classic ESP32
+  #define PIN_CS         15
+  #define PIN_RST         4
+  #define PIN_DC          2
+  #define PIN_MOSI       23
+  #define PIN_SCLK       18
+  #define PIN_MISO       -1   // not used by the display
+  #define PIN_BL         32   // backlight (PWM)
+  #define PIN_TOUCH_SDA  27   // I2C touch
+  #define PIN_TOUCH_SCL  21
+  #define PIN_TOUCH_INT  -1
+  #define PIN_TOUCH_RST  -1
+#endif
+
 LB_Display display(LB_RTP_180);
 //LB_Display display(LB_RTP_240);
 //LB_Display display(LB_RTP_280);
@@ -392,6 +420,14 @@ static void calibrateAndSave() {
 void setup() {
   Serial.begin(115200);
   delay(1000);                                   // the panel needs a moment after power-up
+  LB_Wiring pins = LB_WIRING;   // keeps the SPI bus that fits this chip
+  pins.cs = PIN_CS;  pins.rst = PIN_RST;  pins.dc = PIN_DC;
+  pins.mosi = PIN_MOSI;  pins.sclk = PIN_SCLK;  pins.miso = PIN_MISO;
+  pins.backlight = PIN_BL;
+  pins.touchSda = PIN_TOUCH_SDA;  pins.touchScl = PIN_TOUCH_SCL;
+  pins.touchInt = PIN_TOUCH_INT;  pins.touchRst = PIN_TOUCH_RST;
+  display.setWiring(pins);
+
   // Direct drawing, no canvas: painting stays quick on every size, and the 4.3 inch
   // would not leave much memory for a 261 KB canvas.
   if (!display.begin(false)) {
