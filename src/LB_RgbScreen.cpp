@@ -2,6 +2,7 @@
 
 #include <soc/soc_caps.h>
 #if SOC_LCD_RGB_SUPPORTED
+#include <esp_cache.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_rgb.h>
 #include <esp_timer.h>
@@ -42,6 +43,9 @@ bool LB_RgbScreen::begin(int32_t, bool, bool) {
   esp_lcd_rgb_panel_config_t cfg = {};
   cfg.clk_src = LCD_CLK_SRC_DEFAULT;
   cfg.timings.pclk_hz = b->pclkHz;
+#ifdef LB_RGB_PCLK_HZ
+  cfg.timings.pclk_hz = LB_RGB_PCLK_HZ;   // a build may force the clock to compare
+#endif
   cfg.timings.h_res = _panel->width;
   cfg.timings.v_res = _panel->height;
   cfg.timings.hsync_pulse_width = b->hsPulse;
@@ -63,6 +67,9 @@ bool LB_RgbScreen::begin(int32_t, bool, bool) {
   // (small areas, so a little tearing at worst, as in the Arduino_GFX Sunton configurations).
   const bool direct = b->directScan;
   cfg.num_fbs = direct ? 1 : 2;
+#ifdef LB_RGB_NUM_FBS
+  cfg.num_fbs = LB_RGB_NUM_FBS;        // a build may force it (1 or 2) to compare
+#endif
   // Bounce buffers: the scan-out DMA reads two small buffers in internal SRAM,
   // refilled from the PSRAM framebuffer by an interrupt. Without them the DMA
   // reads PSRAM directly, and when the CPU is busy in PSRAM too - LVGL blending
@@ -119,7 +126,7 @@ bool LB_RgbScreen::begin(int32_t, bool, bool) {
   }
   esp_lcd_panel_init(h);
   _handle = h;
-  s_expectUs = (uint32_t)(1000000.0 * (b->hsPulse + b->hsBack + _panel->width + b->hsFront) * (b->vsPulse + b->vsBack + _panel->height + b->vsFront) / b->pclkHz);
+  s_expectUs = (uint32_t)(1000000.0 * (b->hsPulse + b->hsBack + _panel->width + b->hsFront) * (b->vsPulse + b->vsBack + _panel->height + b->vsFront) / cfg.timings.pclk_hz);
   _fb = (uint16_t *)fb;
   _fb2 = (uint16_t *)fb2;
   sync(0, 0, _panel->width, _panel->height);
@@ -140,13 +147,21 @@ void LB_RgbScreen::setRotation(uint8_t r) {
 }
 
 // Write the cache lines covering this rectangle back to PSRAM, where the scan-
-// out reads them. Handing esp_lcd a pointer that lies inside its own framebuffer
-// makes draw_bitmap do exactly that, and nothing else - no copy.
+// out reads them. Only the whole screen goes through draw_bitmap, with the
+// buffer's own start, which esp_lcd documents as "already in the frame buffer".
+// What it does with a pointer part-way into the buffer is not documented (it may
+// treat it as a separate w x h image and copy it), so a rectangle is written back
+// with esp_cache_msync, from its first pixel to its last - nothing else happens.
 void LB_RgbScreen::sync(int16_t x, int16_t y, int16_t w, int16_t h) {
 #if SOC_LCD_RGB_SUPPORTED
   if (!_handle || w <= 0 || h <= 0) return;
-  esp_lcd_panel_draw_bitmap((esp_lcd_panel_handle_t)_handle, x, y, x + w, y + h,
-                            _fb + (size_t)y * _panel->width + x);
+  const int16_t W = _panel->width;
+  if (x == 0 && y == 0 && w == W && h == _panel->height) {
+    esp_lcd_panel_draw_bitmap((esp_lcd_panel_handle_t)_handle, 0, 0, W, h, _fb);
+    return;
+  }
+  esp_cache_msync(_fb + (size_t)y * W + x, ((size_t)(h - 1) * W + w) * 2,
+                  ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
 #endif
 }
 

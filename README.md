@@ -68,6 +68,9 @@ Arduino/C++ **and** MicroPython, from one shared panel table.
 | 2.31 inch square | `LB_SQUARE_231` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 3.92 inch square | `LB_SQUARE_392` | `SQUARE_392` | 320 x 320 | ST7796 | SPI 40 MHz | — | active high |
 | VGA 800 x 600, with ESP32-S3 | `LB_VGA_800X600` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
+| 4.3 inch RGB | `LB_RGB_430_480X272` | not supported | 480 x 272 | RGB | 16-bit RGB (S3 only) | — | active high |
+| 7 inch RGB | `LB_RGB_700_1024X600` | not supported | 1024 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
+| 10.1 inch RGB | `LB_RGB_1010_1024X600` | not supported | 1024 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 
 ### Third-party screens
 
@@ -501,6 +504,42 @@ Default pins (proposed — the breakout is not final yet):
 CS is tied low and RD high on the board. The data lines, WR and DC are all below
 GPIO 32 on purpose: the bus sets a whole byte with one register write, and pins
 above 31 would need a second.
+
+### The RGB series (ESP32-S3)
+
+Bare 16-bit RGB glass on the IO-to-RGB adapter. There is no controller: the
+S3's LCD_CAM scans a frame buffer in PSRAM out to the glass continuously, so
+**Tools > PSRAM must be OPI PSRAM**. All three sizes use the same adapter and
+the same pins; the panel constant picks the timings. Draw as on any panel and
+call `flush()`.
+
+| Panel | Pixel clock | Refresh | A full-screen JPEG |
+|---|---|---|---|
+| `LB_RGB_430_480X272` | 9 MHz | 57 Hz | 0.3 s |
+| `LB_RGB_700_1024X600` | 30 MHz | 40 Hz | 1.7 s |
+| `LB_RGB_1010_1024X600` | 30 MHz | 40 Hz | 1.7 s |
+
+| | DE | PCLK | Backlight | R0–R4 | G0–G5 | B0–B4 |
+|---|---|---|---|---|---|---|
+| ESP32-S3 | 42 | 41 | 14 | 40, 39, 38, 45, 21 | 13, 12, 11, 10, 9, 3 | 8, 18, 17, 16, 15 |
+
+HSYNC and VSYNC are not wired: the panels run in DE mode. The glass is 24-bit;
+the adapter drives its top 5-6-5 bits.
+
+What the bench taught us about the two 1024 x 600 panels:
+
+- **Refresh.** Their datasheets ask for 51 MHz (60 Hz), out of reach for the
+  S3. At the vendor's 16 MHz (18 Hz) mid greys shimmer, and no VCOM setting
+  fixes that; 40 Hz is steady.
+- **Horizontal blanking must stay long.** With a short gap between lines the
+  10.1 inch looks fine on a still picture, but while a JPEG is decoded it loses
+  its row scan and freezes into vertical streaks. The table keeps a 160-clock
+  back porch for that reason.
+- **VCOM is a trimmer on the adapter, not a register.** Set it on a mid-grey
+  screen to the point of least flicker. A strip of the previous picture that
+  fades over a few seconds is image retention on the glass, and a better VCOM
+  setting reduces it. Keep the glass's DITH pin low (dithering off): only
+  RGB565 is sent, so it has nothing to add.
 
 ---
 

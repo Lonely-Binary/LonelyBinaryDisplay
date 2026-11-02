@@ -781,6 +781,122 @@ panels:
       which used its own init and its own MADCTL table; this entry runs the
       library's ST7796 init and rotation table, so orientation needs checking.
 
+  # ── RGB LCD series (16-bit parallel RGB, ESP32-S3 only) ─────────────────────
+  #
+  # Bare RGB glass on the "IO to RGB" adapter: no controller, the S3's LCD_CAM
+  # scans a PSRAM frame buffer out continuously (bus: rgb, as the boards below).
+  # All three sizes use the same adapter, so the same pins; only the timings
+  # differ. The glass is 24-bit, but the S3 drives 16 lines (R3-R7, G2-G7,
+  # B3-B7, RGB565); the low bits are not connected. HSYNC and VSYNC are not
+  # wired: the panels run in DE mode. Needs PSRAM (OPI). Named by the diagonal
+  # in hundredths of an inch, then the resolution where one size comes in more
+  # than one (7 inch glass is sold as 800x480 and 1024x600, 10.1 inch as 1024x600
+  # and 1280x800). Every name carries the resolution, so the series reads alike.
+
+  - id: rgb_430_480x272
+    product: true
+    name: '4.3 inch RGB'
+    family: rgb-lcd
+    driver: RGB
+    bus: rgb
+    width: 480
+    height: 272
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    backlight_active_low: false   # a 10k pull-down on BL: it must be driven high
+    rgb:
+      pclk_hz: 9000000            # the datasheet's typical (8-12 MHz)
+      # Bounce buffers, not direct_scan: scanned straight out of PSRAM (as on the
+      # Sunton 4.3 inch) the picture shook at every photo change, while the JPEG
+      # decoder wrote PSRAM. This glass takes its rows from DE, so the start-up
+      # shift that made the Sunton board use direct_scan does not apply.
+      hsync: {pulse: 4, back: 43, front: 8}
+      vsync: {pulse: 4, back: 12, front: 8}
+      pclk_active_neg: true
+      pins: &io_to_rgb_pins
+        de: 42
+        vsync: -1                 # not wired: DE mode
+        hsync: -1
+        pclk: 41
+        backlight: 14
+        r: [40, 39, 38, 45, 21]       # R3..R7 on the glass = R0..R4 of RGB565
+        g: [13, 12, 11, 10, 9, 3]     # G2..G7
+        b: [8, 18, 17, 16, 15]        # B3..B7
+    notes: >-
+      HJ4330PI-7, 480x272, no touch, from the vendor's ESP32S3_RGB_4.3 sketch
+      (HJ4330PI7 datasheet typical timings). Same adapter pins as the 7 and 10.1
+      inch. Run 2026-11-02: text, edge page and a photo gallery (0.3 s a photo)
+      come out right; colours judged only through an overexposed camera.
+
+  - id: rgb_700_1024x600
+    product: true
+    name: '7 inch RGB'
+    family: rgb-lcd
+    driver: RGB
+    bus: rgb
+    width: 1024
+    height: 600
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    backlight_active_low: false
+    rgb:
+      # The 10 inch's timings (same 50-pin glass family, same datasheet timings).
+      # Verified 2026-11-02: the photo gallery runs clean at 40 Hz on the 7 inch
+      # glass too. See rgb_1010_1024x600 for why the horizontal blanking is long.
+      pclk_hz: 30000000
+      hsync: &rgb_1024_hsync {pulse: 10, back: 160, front: 20}
+      vsync: &rgb_1024_vsync {pulse: 2, back: 10, front: 5}
+      pclk_active_neg: true
+      pins: *io_to_rgb_pins
+    notes: >-
+      HJ7035GI-27-BD, 1024x600, no touch, from the vendor's ESP32S3_RGB_7 sketch.
+      In DE mode the panel wants VS and HS pulled high on the adapter. Bare glass:
+      AVDD/VGH/VGL/VCOM come from the adapter, with a VCOM trimmer to set per
+      panel on a mid-grey screen. DITHB low (dithering off): the S3 sends only
+      RGB565, so there is nothing for it to add.
+
+  - id: rgb_1010_1024x600
+    product: true
+    name: '10.1 inch RGB'
+    family: rgb-lcd
+    driver: RGB
+    bus: rgb
+    width: 1024
+    height: 600
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    backlight_active_low: false
+    rgb:
+      # Measured 2026-11-02 on the 10 inch glass, watched through a camera. The
+      # vendor's 16 MHz with the datasheet's blanking (1344 x 635) is 18.4 Hz, and
+      # at that rate mid greys shimmer: the glass flips polarity every frame, and
+      # turning the VCOM trimmer only shifts the colour. Raising the clock fixes it.
+      # The vertical blanking can be short, the HORIZONTAL cannot: with 70 clocks
+      # between lines (10/40/20) still pictures look right, but while a JPEG is
+      # being decoded the glass loses its row scan and freezes into vertical
+      # streaks until the timing changes - at 16 MHz just as at 30. With 190
+      # clocks (10/160/20, back porch as the datasheet's 160) it held through
+      # every photo of a gallery. 30 MHz over 1214 x 617 = 40 Hz.
+      pclk_hz: 30000000
+      hsync: *rgb_1024_hsync
+      vsync: *rgb_1024_vsync
+      pclk_active_neg: true
+      pins: *io_to_rgb_pins
+    notes: >-
+      SH010JGI55-01013L (HX8282-A11 + HX8696), 1024x600, no touch, from the
+      vendor's ESP32S3_RGB_10 sketch. Same 50-pin pinout and timings as the 7
+      inch. The pin table in the vendor's README is an older wiring; the
+      sketch's is the one used here. Bare glass: the adapter makes the bias
+      voltages and has a VCOM trimmer, set per panel on a mid-grey screen. DITH
+      low (dithering off): only RGB565 is sent, so it has nothing to add, and its
+      frame-to-frame dither would add shimmer of its own.
+
   # ── Third-party boards ─────────────────────────────────────────────────────
   #
   # A display and an ESP32-S3 on one PCB, sold by someone else. Named by the

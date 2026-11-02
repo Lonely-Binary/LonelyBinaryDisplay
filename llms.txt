@@ -128,6 +128,9 @@ hand.
 | 2.0 inch square | `LB_SQUARE_200` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 2.31 inch square | `LB_SQUARE_231` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 3.92 inch square | `LB_SQUARE_392` | `SQUARE_392` | 320 x 320 | ST7796 | SPI 40 MHz | — | active high |
+| 4.3 inch RGB | `LB_RGB_430_480X272` | not supported | 480 x 272 | RGB | 16-bit RGB (S3 only) | — | active high |
+| 7 inch RGB | `LB_RGB_700_1024X600` | not supported | 1024 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
+| 10.1 inch RGB | `LB_RGB_1010_1024X600` | not supported | 1024 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 | Lonely Binary ESP32-S3 VGA 800x600 | `LB_VGA_800X600` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 
 **Screen size is the size after the panel's default rotation**, which is
