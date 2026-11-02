@@ -39,6 +39,16 @@
 #include "LB_Panels.h"
 #include "LB_Wiring.h"
 
+// The pins of a 16-bit RGB board (the VGA board, the Sunton boards). The timings
+// belong to the screen and stay in the panel table; only the GPIOs are here.
+// Data pins in LCD_CAM order: B0-B4, G0-G5, R0-R4. -1 = not wired.
+struct LB_WiringRgb {
+  int8_t hsync, vsync, de, pclk, backlight;
+  int8_t data[16];
+  int8_t touchSda, touchScl, touchInt, touchRst;   // I2C touch
+  int8_t touchSck, touchMiso, touchMosi, touchCs;  // SPI touch
+};
+
 class LB_Display : private LB_TFTPanel, public LB_Canvas {
  public:
   /*
@@ -69,6 +79,7 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
       _wiring.mosi = b.mosi; _wiring.miso = b.miso; _wiring.sclk = b.sclk;
       _wiring.backlight = b.backlight;   // spiHost stays the MCU's
     }
+    if (panel->rgb) _rgbBoard = *panel->rgb;
     if (panel->par8) {
       const LB_Par8Board &b = *panel->par8;
       for (int i = 0; i < 8; i++) _wiringPar8.data[i] = b.data[i];
@@ -116,6 +127,16 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   //
   // Which of the two applies is decided by the panel constant, not by you.
   void setWiring(const LB_WiringPar8 &wiring);
+
+  // The same for a 16-bit RGB board (the VGA board): the GPIOs only, the
+  // timings stay with the panel.
+  //
+  //     LB_WiringRgb pins = display.wiringRgb();   // this board's default
+  //     pins.hsync = 2;
+  //     pins.data[0] = 11;                         // B0
+  //     display.setWiring(pins);
+  void setWiring(const LB_WiringRgb &wiring);
+  LB_WiringRgb wiringRgb() const;
 
   // Override the panel table's SPI clock. Useful when your own wiring has
   // longer traces or a ribbon extension and the default rate is marginal —
@@ -279,6 +300,7 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   int32_t            _spiHzOverride = 0;
   int16_t            _vcomOverride = -1;  // setVcom() before begin(), -1 = none
   LB_WiringPar8      _wiringPar8 = LB_WIRING_PAR8;
+  LB_RgbBoard        _rgbBoard = {};      // the RGB board's pins; a copy so setWiring() can change them
   LB_TFTBus         *_bus    = nullptr;
   LB_Touch          *_touch  = nullptr;
   LB_Screen         *_tft    = nullptr;  // the panel itself: LB_TFT or LB_RgbScreen
@@ -298,7 +320,7 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   bool rgb() const { return _panel->bus == LB_BUS_RGB; }
   int8_t blPin() const {
     if (_panel->driver == LB_DRV_ST7305) return -1;   // reflective: no backlight
-    return rgb() ? _panel->rgb->backlight : par8() ? _wiringPar8.backlight : _wiring.backlight;
+    return rgb() ? _rgbBoard.backlight : par8() ? _wiringPar8.backlight : _wiring.backlight;
   }
 };
 

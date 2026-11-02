@@ -17,6 +17,15 @@
 */
 #include <LonelyBinaryDisplay.h>
 
+// ---- GPIO wiring. Every pin this sketch uses is here - change the numbers to match
+// ---- your board; nothing below refers to a GPIO by number. -1 = not connected.
+#define PIN_CS    5
+#define PIN_DC    16
+#define PIN_RST   17
+#define PIN_MOSI  23
+#define PIN_SCLK  18
+#define PIN_BL    4    // backlight: a GPIO = dimmable, -1 = none (hard-wired on)
+
 LB_Display display(LB_TFT_24);
 //LB_Display display(LB_TFT_096);
 //LB_Display display(LB_TFT_18);
@@ -32,17 +41,17 @@ void setup() {
   LB_Wiring pins = LB_WIRING;
 
   // ...then change only the pins that are different on your hardware.
-  pins.cs   = 5;
-  pins.dc   = 16;
-  pins.rst  = 17;
-  pins.mosi = 23;
-  pins.sclk = 18;
+  pins.cs   = PIN_CS;
+  pins.dc   = PIN_DC;
+  pins.rst  = PIN_RST;
+  pins.mosi = PIN_MOSI;
+  pins.sclk = PIN_SCLK;
 
   // Backlight options:
   //   a GPIO   -> dimmable with display.backlight(0..255)
   //   -1       -> no backlight pin (hard-wired on, or you drive it yourself);
   //               backlight() then does nothing instead of poking a stray pin
-  pins.backlight = 4;
+  pins.backlight = PIN_BL;
 
   // Both of these must come before begin().
   display.setWiring(pins);

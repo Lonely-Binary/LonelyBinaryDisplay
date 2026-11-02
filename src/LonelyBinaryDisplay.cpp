@@ -1,3 +1,4 @@
+#include <string.h>
 #include "LonelyBinaryDisplay.h"
 
 // ─── Backlight PWM ───────────────────────────────────────────────────────────
@@ -35,14 +36,36 @@ void LB_Display::setInverted(bool inverted) {
 
 void LB_Display::setWiring(const LB_Wiring &wiring) {
   if (_tft) return;  // too late; begin() has already built the bus
+  if (memcmp(&_wiring, &wiring, sizeof wiring)) _customWiring = true;   // same as the default is not custom
   _wiring = wiring;
-  _customWiring = true;
 }
 
 void LB_Display::setWiring(const LB_WiringPar8 &wiring) {
   if (_tft) return;
+  if (memcmp(&_wiringPar8, &wiring, sizeof wiring)) _customWiring = true;
   _wiringPar8 = wiring;
-  _customWiring = true;
+}
+
+void LB_Display::setWiring(const LB_WiringRgb &w) {
+  if (_tft) return;
+  const LB_WiringRgb before = wiringRgb();
+  if (memcmp(&before, &w, sizeof w)) _customWiring = true;
+  _rgbBoard.hsync = w.hsync; _rgbBoard.vsync = w.vsync; _rgbBoard.de = w.de;
+  _rgbBoard.pclk = w.pclk; _rgbBoard.backlight = w.backlight;
+  for (int i = 0; i < 16; i++) _rgbBoard.data[i] = w.data[i];
+  _rgbBoard.touchSda = w.touchSda; _rgbBoard.touchScl = w.touchScl;
+  _rgbBoard.touchInt = w.touchInt; _rgbBoard.touchRst = w.touchRst;
+  _rgbBoard.touchSck = w.touchSck; _rgbBoard.touchMiso = w.touchMiso;
+  _rgbBoard.touchMosi = w.touchMosi; _rgbBoard.touchCs = w.touchCs;
+}
+
+LB_WiringRgb LB_Display::wiringRgb() const {
+  const LB_RgbBoard &b = _rgbBoard;
+  LB_WiringRgb w = {b.hsync, b.vsync, b.de, b.pclk, b.backlight, {},
+                    b.touchSda, b.touchScl, b.touchInt, b.touchRst,
+                    b.touchSck, b.touchMiso, b.touchMosi, b.touchCs};
+  for (int i = 0; i < 16; i++) w.data[i] = b.data[i];
+  return w;
 }
 
 static bool hasVcom(const LB_PanelDef *p) {
@@ -77,7 +100,7 @@ bool LB_Display::begin(bool useCanvas) {
   if (rgb()) {
     // No bus and no controller: the S3 scans the panel out of a framebuffer
     // that the driver allocates in PSRAM.
-    _tft = new LB_RgbScreen(_panel);
+    _tft = new LB_RgbScreen(_panel, _rgbBoard);
   } else if (par8()) {
     _bus = new LB_TFTPar8Bus(_wiringPar8.data, _wiringPar8.wr, _wiringPar8.dc,
                              _wiringPar8.cs, _wiringPar8.rd);
@@ -159,7 +182,7 @@ void LB_Display::touchBegin() {
   // parallel wiring set.
   LB_TouchPins pins = {};
   if (rgb()) {
-    const LB_RgbBoard *b = _panel->rgb;
+    const LB_RgbBoard *b = &_rgbBoard;
     pins = {b->touchSda, b->touchScl, b->touchInt, b->touchRst,
             b->touchSck, b->touchMiso, b->touchMosi, b->touchCs};
   } else if (_panel->bus == LB_BUS_SPI && !_panel->spi) {
@@ -284,7 +307,7 @@ void LB_Display::printInfo(Print &out) const {
   out.printf("Resolution : %dx%d  (native %dx%d, rotation %d)\n",
              width(), height(), _panel->width, _panel->height, _panel->rotation);
   if (rgb())
-    out.printf("Bus        : 16-bit RGB, pixel clock %lu Hz\n", (unsigned long)_panel->rgb->pclkHz);
+    out.printf("Bus        : 16-bit RGB, pixel clock %lu Hz\n", (unsigned long)_rgbBoard.pclkHz);
   else if (par8())
     out.println(F("Bus        : 8-bit parallel"));
   else
@@ -298,7 +321,7 @@ void LB_Display::printInfo(Print &out) const {
   out.printf("Board      : %s%s\n", LB_WIRING_NAME,
              _customWiring ? "  (custom wiring)" : "");
   if (rgb()) {
-    const LB_RgbBoard *b = _panel->rgb;
+    const LB_RgbBoard *b = &_rgbBoard;
     out.printf("Pins       : fixed by the board. DE=%d VSYNC=%d HSYNC=%d PCLK=%d BL=%d\n",
                b->de, b->vsync, b->hsync, b->pclk, b->backlight);
   } else if (par8()) {

@@ -52,6 +52,27 @@ static const int32_t  SPI_HZ      = 40000000;   // SPI panels only (not the 1.96
 static const uint32_t IDLE_DIM_MS = 15000;      // dim after this long without a touch
 static const uint8_t  DIM_LEVEL   = 25;         // backlight while dimmed, 0-255
 
+// ---- GPIO wiring. Every pin this sketch uses is here - change the numbers to match
+// ---- your board; nothing below refers to a GPIO by number. -1 = not connected.
+#define PIN_D0          5   // 8-bit data bus
+#define PIN_D1          6
+#define PIN_D2          4
+#define PIN_D3          7
+#define PIN_D4         15
+#define PIN_D5          1
+#define PIN_D6         10
+#define PIN_D7         11
+#define PIN_WR          2   // write strobe
+#define PIN_DC         42
+#define PIN_RST        -1
+#define PIN_BL         -1   // backlight: none
+#define PIN_CS         41
+#define PIN_RD         -1   // tied high
+#define PIN_TOUCH_SDA  13   // I2C touch
+#define PIN_TOUCH_SCL  12
+#define PIN_TOUCH_INT  -1
+#define PIN_TOUCH_RST  -1
+
 LB_Display display(LB_TAP_196_CTP);
 //LB_Display display(LB_TAP_128_CTP);
 //LB_Display display(LB_TAP_150_CTP);
@@ -498,6 +519,15 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   display.setSpiHz(SPI_HZ);
+  LB_WiringPar8 pins = LB_WIRING_PAR8;
+  const int8_t dataPins[8] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7};
+  for (int i = 0; i < 8; i++) pins.data[i] = dataPins[i];
+  pins.wr = PIN_WR;  pins.dc = PIN_DC;  pins.rst = PIN_RST;  pins.backlight = PIN_BL;
+  pins.cs = PIN_CS;  pins.rd = PIN_RD;
+  pins.touchSda = PIN_TOUCH_SDA;  pins.touchScl = PIN_TOUCH_SCL;
+  pins.touchInt = PIN_TOUCH_INT;  pins.touchRst = PIN_TOUCH_RST;
+  display.setWiring(pins);
+
   if (!display.begin(true)) {
     Serial.println("Display did not start - check the wiring.");
     while (true) delay(1000);

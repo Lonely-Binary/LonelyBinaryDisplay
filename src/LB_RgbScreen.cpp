@@ -37,8 +37,7 @@ LB_RgbScreen::~LB_RgbScreen() {
 
 bool LB_RgbScreen::begin(int32_t, bool, bool) {
 #if SOC_LCD_RGB_SUPPORTED
-  const LB_RgbBoard *b = _panel->rgb;
-  if (!b) return false;
+  const LB_RgbBoard *b = &_board;
 
   esp_lcd_rgb_panel_config_t cfg = {};
   cfg.clk_src = LCD_CLK_SRC_DEFAULT;

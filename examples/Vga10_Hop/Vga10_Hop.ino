@@ -17,6 +17,29 @@
 */
 #include <LonelyBinaryDisplay.h>
 
+// ---- GPIO wiring. Every pin this sketch uses is here - change the numbers to match
+// ---- your board; nothing below refers to a GPIO by number. -1 = not connected.
+#define PIN_HSYNC   2   // VGA connector
+#define PIN_VSYNC   1
+#define PIN_B0     11   // blue  - 5-bit R2R ladder, B0 = least significant
+#define PIN_B1     12
+#define PIN_B2     13
+#define PIN_B3     14
+#define PIN_B4     21
+#define PIN_G0     17   // green - 6-bit ladder
+#define PIN_G1     18
+#define PIN_G2      8
+#define PIN_G3      3
+#define PIN_G4      9
+#define PIN_G5     10
+#define PIN_R0      7   // red   - 5-bit ladder
+#define PIN_R1     15
+#define PIN_R2     16
+#define PIN_R3     38
+#define PIN_R4     39
+
+#define PIN_BOOT   0   // the on-board BOOT button
+
 LB_Display display(LB_VGA_800X600);
 
 static const int GROUND = 470;                 // y of the ground line
@@ -41,7 +64,7 @@ static void waitFrame() {
   do { delay(1); display.scanStats(&f1, &d, &d); } while (f1 == f0 && millis() - t0 < 40);
 }
 
-static bool pressed() { return digitalRead(0) == LOW; }
+static bool pressed() { return digitalRead(PIN_BOOT) == LOW; }
 
 static void newObstacle(int i, float after) {
   ow[i] = 24 + random(0, 3) * 12;
@@ -81,7 +104,15 @@ static void newGame() {
 
 void setup() {
   Serial.begin(115200);
-  pinMode(0, INPUT_PULLUP);
+  pinMode(PIN_BOOT, INPUT_PULLUP);
+  LB_WiringRgb pins = display.wiringRgb();   // the board's default, then yours
+  pins.hsync = PIN_HSYNC;  pins.vsync = PIN_VSYNC;
+  const int8_t dataPins[16] = {PIN_B0, PIN_B1, PIN_B2, PIN_B3, PIN_B4,
+                              PIN_G0, PIN_G1, PIN_G2, PIN_G3, PIN_G4, PIN_G5,
+                              PIN_R0, PIN_R1, PIN_R2, PIN_R3, PIN_R4};
+  for (int i = 0; i < 16; i++) pins.data[i] = dataPins[i];
+  display.setWiring(pins);
+
   if (!display.begin()) {
     Serial.println("VGA did not start. Is Tools > PSRAM set to OPI PSRAM?");
     return;

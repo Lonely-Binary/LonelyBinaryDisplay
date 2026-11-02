@@ -14,8 +14,8 @@
 
   dance_213.h (250 x 122), dance_290.h (384 x 168) and dance_420.h (400 x 300)
   are made from a video by tools/video_to_rlcd.py; run that script on any clip
-  (see its header) to make one for another size, or from your own video. A clip
-  smaller than the screen is centred; one larger than the screen is skipped.
+  (see its header) to make one for another size, or from your own video. A clip smaller than the screen
+  is centred; one larger than the screen is skipped.
 
   The BOOT button (GPIO 0) skips to the next scene.
 
@@ -46,6 +46,26 @@
   #include "dance_420.h"
 #endif
 
+// ---- GPIO wiring. Every pin this sketch uses is here - change the numbers to match
+// ---- your board; nothing below refers to a GPIO by number. -1 = not connected.
+#if CONFIG_IDF_TARGET_ESP32S3   // ESP32-S3 (Lonely Binary kit)
+  #define PIN_CS    10
+  #define PIN_RST   42
+  #define PIN_DC     2
+  #define PIN_MOSI  11
+  #define PIN_SCLK  12
+  #define PIN_MISO  -1   // not used by the display
+#else                           // classic ESP32
+  #define PIN_CS    15
+  #define PIN_RST    4
+  #define PIN_DC     2
+  #define PIN_MOSI  23
+  #define PIN_SCLK  18
+  #define PIN_MISO  -1   // not used by the display
+#endif
+
+#define PIN_BOOT   0   // the on-board BOOT button
+
 LB_Display display(RLCD_PANEL);
 
 static int W, H;
@@ -58,7 +78,6 @@ static const uint16_t BLACK_PX = 0x0000, WHITE_PX = 0xFFFF;
 static const uint32_t FRAME_MS = 31;
 
 // The BOOT button on the dev board: press it to skip to the next scene.
-static const int SKIP_PIN = 0;
 static bool g_unchanged = false;   // a scene sets this when it has nothing new to show
 
 // Types first: the Arduino build puts function prototypes above the first function.
@@ -428,6 +447,11 @@ static void caption(int index) {
 void setup() {
   Serial.begin(115200);
   delay(500);
+  LB_Wiring pins = LB_WIRING;   // keeps the SPI bus that fits this chip
+  pins.cs = PIN_CS;  pins.rst = PIN_RST;  pins.dc = PIN_DC;
+  pins.mosi = PIN_MOSI;  pins.sclk = PIN_SCLK;  pins.miso = PIN_MISO;
+  display.setWiring(pins);
+
   if (!display.begin()) {
     Serial.println("panel did not start - check wiring (the 4.2 inch also needs PSRAM)");
     while (true) delay(1000);
@@ -443,7 +467,7 @@ void setup() {
   lh = H / CELL;
   life[0] = (uint8_t *)calloc(lw * lh, 1);
   life[1] = (uint8_t *)calloc(lw * lh, 1);
-  pinMode(SKIP_PIN, INPUT_PULLUP);
+  pinMode(PIN_BOOT, INPUT_PULLUP);
   setTimeFromCompile();
   clipFrame = (uint8_t *)calloc((size_t)((lb_clip_w + 7) / 8) * lb_clip_h, 1);
 }
@@ -458,7 +482,7 @@ void loop() {
     bool first = true;
     while (millis() - start < s.ms) {
       static bool wasDown = false;
-      const bool down = digitalRead(SKIP_PIN) == LOW;
+      const bool down = digitalRead(PIN_BOOT) == LOW;
       const bool pressed = down && !wasDown;
       wasDown = down;
       if (pressed) { Serial.println("  BOOT: next scene"); delay(40); break; }

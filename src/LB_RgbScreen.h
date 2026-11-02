@@ -27,7 +27,7 @@
 class LB_RgbScreen : public LB_Screen
 {
 public:
-  LB_RgbScreen(const LB_PanelDef *panel) : _panel(panel) {}
+  LB_RgbScreen(const LB_PanelDef *panel, const LB_RgbBoard &board) : _panel(panel), _board(board) {}
   ~LB_RgbScreen();
 
   bool begin(int32_t hz, bool bgr, bool invert) override;
@@ -47,6 +47,7 @@ public:
 
 private:
   const LB_PanelDef *_panel;
+  LB_RgbBoard _board;        /* the panel's board, with any pins the sketch changed */
   void *_handle = nullptr;   /* esp_lcd_panel_handle_t, kept opaque here */
   uint16_t *_fb = nullptr;
   uint16_t *_fb2 = nullptr;      /* second buffer, when there was PSRAM for it */
