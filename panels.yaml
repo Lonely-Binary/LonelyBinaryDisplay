@@ -993,13 +993,16 @@ panels:
       MISO 13), headers P1 (UART0 43/44) and P4 (17, 18).
       The 750 KB framebuffer is scanned out of PSRAM at 25 MB/s.
 
-  - id: vga_800x600
+  - id: vga_16bit
     product: true
-    const: LB_VGA_800X600
-    name: 'Lonely Binary ESP32-S3 VGA 800x600'
+    const: LB_VGA_16BIT
+    name: 'Lonely Binary ESP32-S3 VGA 16-bit'
     family: board
     driver: RGB
     bus: rgb
+    # width / height are the DEFAULT resolution (what begin() gives without setResolution()). The board itself is not tied to
+    # one resolution: the 16-bit (5-6-5) resistor ladder takes whatever timing the S3 sends, and `modes` below lists the others.
+    # This entry was LB_VGA_800X600 until 0.2.0; that name is kept as a deprecated alias with the same default.
     width: 800
     height: 600
     rotation: 0
@@ -1008,18 +1011,26 @@ panels:
     invert: false
     backlight_active_low: false
     rgb:
-      # 32 MHz over 1024 x 625 total pixels = 800x600 @ 50 Hz, positive sync. The standard VESA 800x600 @ 56 Hz is 36 MHz and was
+      # 32 MHz over 1024 x 626 total pixels = 800x600 @ 49.9 Hz, positive sync. The standard VESA 800x600 @ 56 Hz is 36 MHz and was
       # tried first, but it leaves no margin: the bounce buffers (10 lines, 16000 bytes) are refilled from PSRAM by a CPU copy that
       # must finish in 10 line times. Measured with the picture running: a cold copy takes 250-300 us and the budget at 36 MHz is
       # 284 us (320 us at 32 MHz), so whether a line makes it depends on what the data cache holds - short streaks at the left of
       # some lines, and a one-line change in a sketch could switch them on or off. At 32 MHz the same code is clean.
       # (VESA 800x600 @ 60 is 40 MHz and needs 80 MB/s; the PSRAM manages about 60.) A sketch must still not do big PSRAM reads or
       # writes while it runs, and the Wi-Fi radio on makes the picture shake. Two frame buffers and ten-line bounce buffers (600 / 10 = 60).
+      # 626 lines, not 625 (2026-11-05): 1024 x 625 at 32 MHz is exactly 20.000 ms, twenty 1 ms FreeRTOS ticks, so the tick
+      # interrupt falls on the same bounce-buffer refill every frame, at a place fixed at power-up. On the HDMI board, with the same
+      # timing, that gave static streaks at the left on about 6 boots in 10; with 626 lines (20.032 ms, 49.9 Hz) 1 in 10.
       pclk_hz: 32000000
       # Positive-going sync pulses, as VESA 800x600 asks (idle low).
       hsync: {pulse: 72, back: 128, front: 24}
-      vsync: {pulse: 2, back: 22, front: 1}
+      vsync: {pulse: 2, back: 22, front: 2}
       pclk_active_neg: false
+      # Other resolutions, for display.setResolution(w, h). The default above is always the first one.
+      modes:
+        # VESA 640x480 @ 60, negative sync. Timing from Lonely Binary VGA 2.0 on this same board (25.0 MHz is -0.7 % from
+        # 25.175, inside VGA tolerance; measured 59.5 Hz there). Not yet re-measured through this library.
+        - {width: 640, height: 480, pclk_hz: 25000000, hsync: {pulse: 96, back: 48, front: 16}, vsync: {pulse: 2, back: 33, front: 10}, sync_idle_high: true}
       pins:
         # A VGA monitor has no data-enable and takes no pixel clock: both are -1, which esp_lcd runs as HV mode, the sync pulses alone
         # framing the picture. The 16 data lines are a resistor ladder (5-6-5) into the DE-15 connector.
@@ -1032,8 +1043,123 @@ panels:
         g: [17, 18, 8, 3, 9, 10]    # G0..G5
         b: [11, 12, 13, 14, 21]     # B0..B4
     notes: >-
-      VGA out of an ESP32-S3 N16R8 through a 16-bit R2R ladder (output/VGA/PCB, 14-bit V4 board), 800x600 at 50 Hz. No touch. Drawing into the screen manages 2 to 5 million pixels a second (a full-screen fill takes about 0.23 s), because the scan-out takes most of the PSRAM bandwidth. BOOT
-      (GPIO0) is the only button; UART0 is GPIO43/44. Pins and timings are the ones that ran in the VGA_PhotoGallery sketch.
+      VGA out of an ESP32-S3 N16R8 through a 16-bit (5-6-5) R2R ladder, default 800x600 at 50 Hz, 640x480 at 60 Hz with
+      setResolution(640, 480). No touch. Drawing into the screen manages 2 to 5 million pixels a second (a full-screen fill takes about
+      0.23 s), because the scan-out takes most of the PSRAM bandwidth. BOOT (GPIO0) is the only button; UART0 is GPIO43/44. Pins and
+      timings are the ones that ran in the VGA_PhotoGallery sketch.
+
+  - id: hdmi_rgb
+    product: true
+    const: LB_HDMI_RGB
+    name: 'Lonely Binary ESP32-S3 RGB to HDMI'
+    family: board
+    driver: RGB
+    bus: rgb
+    # Default resolution; setResolution() picks another from `modes`.
+    width: 800
+    height: 600
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    backlight_active_low: false
+    rgb:
+      # The S3 sends RGB565 with a pixel clock and DE to a SiI9022A HDMI transmitter (U1), which is set up over I2C (TPI) by
+      # begin(): see LB_HdmiSii9022.cpp. Board: "ESP32-S3 RGB转HDMI V2" (schematic and netlist 2026-11-04).
+      # Default 800x600 @ 50: the VGA board's timing, 32 MHz from PLL160 / 5 (an integer divide, so no clock jitter). Chosen as the
+      # default on 2026-11-05 after every mode below showed on the monitor; setResolution(640, 480) is the one for a fussy monitor.
+      # 626 lines, not 625: with 625 a frame is exactly 20.000 ms, twenty of the 1 ms FreeRTOS ticks, so the tick interrupt lands on
+      # the same bounce-buffer refill every frame, fixed at power-up; on about 6 boots in 10 that refill was late every frame and
+      # the picture had streaks at the left until the next boot. 626 lines (20.032 ms) lets the tick drift: 1 boot in 10 then.
+      pclk_hz: 32000000
+      hsync: {pulse: 72, back: 128, front: 24}
+      vsync: {pulse: 2, back: 22, front: 2}
+      clk_src: pll160
+      pclk_active_neg: false     # the S3 changes data on the rising edge, the SiI9022A latches on the rising edge (TPI 0x08 = 0x70)
+      # Every resolution below was run on the board on 2026-11-04 (two RGB565 frame buffers in PSRAM, ten- or twelve-line bounce
+      # buffers, a box being redrawn while it scans out): 0 late frames in each, the monitor connected throughout. The first five are
+      # standard or near-standard and taken by nearly everything. The last four get their size by giving up refresh rate (the pixel
+      # clock stays at 32 MHz - past about 36 MHz the scan-out cannot keep up): 27 to 35 Hz, which some monitors refuse ("no signal").
+      # Each line keeps at least 128 pixels of blanking, because the HDMI audio packets travel in the horizontal blank (80 pixels
+      # gave noise on the board, 128 and up were clean). See docs/HDMI_RGB.md.
+      modes:
+        # 640x480 with the clock the board has always run at: 27.178 MHz from the default clock source (64.7 Hz by the numbers;
+        # VESA wants 25.175), negative sync. The SiI9022A is told the timing is non-standard (VIC 0). The safest on old monitors.
+        - {width: 640, height: 480, pclk_hz: 27178000, hsync: {pulse: 96, back: 48, front: 16}, vsync: {pulse: 2, back: 33, front: 10}, sync_idle_high: true}
+        - {width: 720, height: 480, pclk_hz: 27000000, hsync: {pulse: 62, back: 60, front: 16}, vsync: {pulse: 6, back: 30, front: 9}, sync_idle_high: true}
+        # 576p has one line more than CEA's 625 for the same reason as the default: 864 x 625 at 27 MHz is exactly 20.000 ms.
+        - {width: 720, height: 576, pclk_hz: 27000000, hsync: {pulse: 64, back: 68, front: 12}, vsync: {pulse: 5, back: 39, front: 6}, sync_idle_high: true}
+        # setResolution(800, 600) is the default above; setResolution(800, 600, 56) the VESA 56 Hz at 36 MHz.
+        - {width: 800, height: 600, pclk_hz: 36000000, hsync: {pulse: 72, back: 128, front: 24}, vsync: {pulse: 2, back: 22, front: 1}}
+        # Higher resolutions, low refresh rates: some monitors refuse them.
+        - {width: 1024, height: 768, pclk_hz: 32000000, hsync: {pulse: 32, back: 80, front: 48}, vsync: {pulse: 3, back: 10, front: 1}, clk_src: pll160}
+        - {width: 1280, height: 720, pclk_hz: 32000000, hsync: {pulse: 32, back: 64, front: 48}, vsync: {pulse: 5, back: 20, front: 5}, clk_src: pll160}
+        - {width: 1366, height: 768, pclk_hz: 32000000, hsync: {pulse: 32, back: 56, front: 40}, vsync: {pulse: 5, back: 14, front: 3}, clk_src: pll160}
+        - {width: 1280, height: 800, pclk_hz: 32000000, hsync: {pulse: 32, back: 64, front: 48}, vsync: {pulse: 6, back: 19, front: 3}, clk_src: pll160}
+      hdmi_tx: sii9022           # U1, TPI over I2C
+      i2c: {sda: 5, scl: 4, addr: 0x3B}   # CI2CA pulled high by R9: TPI address 0x3B, not the default 0x39
+      i2s: {bclk: 42, ws: 41, dout: 40}   # into the SiI9022A's SCK / WS / SD0: HDMI sound. MCLK is not wired and not needed.
+      pins:
+        de: 45
+        vsync: 39
+        hsync: 38
+        pclk: 12
+        backlight: -1
+        # Only the top bits of each colour reach the SiI9022A (D23-19, D15-10, D7-3); the rest of its 24 inputs float.
+        r: [18, 17, 16, 15, 6]      # R0..R4 -> D19..D23
+        g: [11, 10, 9, 46, 3, 8]    # G0..G5 -> D10..D15
+        b: [48, 47, 21, 14, 13]     # B0..B4 -> D3..D7
+    notes: >-
+      HDMI out of an ESP32-S3 N16R8 through a SiI9022A transmitter: picture and sound. Default 800x600 @ 50; setResolution() also takes
+      640x480, 720x480, 720x576, 800x600 @ 56, and - at 27 to 35 Hz, which some monitors refuse - 1024x768, 1280x720, 1366x768 and
+      1280x800. RESET of the SiI9022A is tied to the board's RST button, not to a GPIO, so ESP.restart() does
+      not reset it; begin() always sets it up from scratch. Unplugging and re-plugging the HDMI cable is handled in the background
+      (the chip is set up again within about a second). I2C on GPIO4/5 is the library's: a sketch that uses Wire must use the same
+      pins. Serial is the native USB port: Tools > USB CDC On Boot > Enabled.
+
+  - id: hdmi_vga
+    product: true
+    const: LB_HDMI_VGA
+    name: 'Lonely Binary ESP32-S3 VGA to HDMI'
+    family: board
+    driver: RGB
+    bus: rgb
+    width: 720
+    height: 576
+    rotation: 0
+    offsets: [0, 0, 0, 0]
+    bgr: false
+    invert: false
+    backlight_active_low: false
+    rgb:
+      # The S3 drives two R-2R ladders and HSYNC/VSYNC like a VGA board, and an MS9288C digitises that analogue VGA and sends HDMI.
+      # No pixel clock or DE reaches it: the MS9288C rebuilds its sampling clock from HSYNC, so the pixel clock must be an INTEGER
+      # divide of PLL160 / PLL240 - a fractional divider's jitter shows as ragged vertical edges. The MS9288C runs in its internal-MCU
+      # mode and needs no setup. Board: ESP32S3-HDMI-Shield v1 / Debug-T1 (ai-pcb). Timings from its hdmi_resolution_test firmware:
+      # 720x576@49, 720x480@59 and 640x480@57 are clean there; 800x600@60 (40 MHz) shakes, and above that fails.
+      # NOT YET RUN THROUGH THIS LIBRARY.
+      pclk_hz: 26666667          # PLL160 / 6; standard 576p is 27 MHz (-1.2 %), 49.4 Hz
+      hsync: {pulse: 64, back: 68, front: 12}
+      vsync: {pulse: 5, back: 39, front: 5}
+      pclk_active_neg: false
+      sync_idle_high: true       # negative sync, as 576p
+      clk_src: pll160
+      modes:
+        - {width: 720, height: 480, pclk_hz: 26666667, hsync: {pulse: 62, back: 60, front: 16}, vsync: {pulse: 6, back: 30, front: 9}, sync_idle_high: true, clk_src: pll160}
+        - {width: 640, height: 480, pclk_hz: 24000000, hsync: {pulse: 96, back: 48, front: 16}, vsync: {pulse: 2, back: 33, front: 10}, sync_idle_high: true, clk_src: pll240}
+      pins:
+        de: -1
+        vsync: 5
+        hsync: 4
+        pclk: -1
+        backlight: -1
+        r: [38, 39, 40, 41, 42]     # R0..R4
+        g: [10, 9, 46, 3, 8, 18]    # G0..G5
+        b: [17, 16, 15, 7, 6]       # B0..B4
+    notes: >-
+      HDMI out of an ESP32-S3 N16R8 through an MS9288C VGA-to-HDMI converter. Default 720x576 at 49.4 Hz; setResolution() also
+      takes 720x480 and 640x480. Picture only for now: the board's audio path is not supported by the library yet.
+      Not yet verified with this library.
 
   # ── Panels we do NOT sell ──────────────────────────────────────────────────
   #

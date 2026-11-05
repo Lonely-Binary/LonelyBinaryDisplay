@@ -41,7 +41,7 @@
 #define PIN_R3     38
 #define PIN_R4     39
 
-LB_Display display(LB_VGA_800X600);
+LB_Display display(LB_VGA_16BIT);
 
 static const lb_color_t BG      = LB_RGB(12, 15, 20);
 static const lb_color_t SURFACE = LB_RGB(20, 25, 35);

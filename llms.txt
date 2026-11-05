@@ -131,7 +131,9 @@ hand.
 | 4.3 inch RGB | `LB_RGB_430_480X272` | not supported | 480 x 272 | RGB | 16-bit RGB (S3 only) | — | active high |
 | 7 inch RGB | `LB_RGB_700_1024X600` | not supported | 1024 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 | 10.1 inch RGB | `LB_RGB_1010_1024X600` | not supported | 1024 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
-| Lonely Binary ESP32-S3 VGA 800x600 | `LB_VGA_800X600` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
+| Lonely Binary ESP32-S3 VGA 16-bit | `LB_VGA_16BIT` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
+| Lonely Binary ESP32-S3 RGB to HDMI | `LB_HDMI_RGB` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
+| Lonely Binary ESP32-S3 VGA to HDMI | `LB_HDMI_VGA` | not supported | 720 x 576 | RGB | 16-bit RGB (S3 only) | — | active high |
 
 **Screen size is the size after the panel's default rotation**, which is
 what `width()` / `height()` return and what you should lay a UI out
@@ -176,9 +178,57 @@ controller may well need `setColorOrder()` / `setInverted()` /
 
 ---
 
-## VGA 800x600 (`LB_VGA_800X600`) - on sale
+## Resolution: the VGA and HDMI boards
 
-A Lonely Binary VGA board with an ESP32-S3 (N16R8). 800 x 600 @ 50 Hz (32 MHz pixel clock), RGB565,
+`LB_VGA_16BIT`, `LB_HDMI_RGB` and `LB_HDMI_VGA` are boards, not screens of one size. The constant gives a
+default size; `display.setResolution(w, h)` BEFORE `begin()` picks another from the ones that board was
+measured at, and returns false (listing the valid ones on Serial) for anything else. Never compute
+timings or pass a pixel clock: there is no API for that. `width()`/`height()` follow the chosen size,
+so lay out with them, never with literal 800/600.
+
+```cpp
+LB_Display display(LB_HDMI_RGB);
+void setup() {
+  display.setResolution(1280, 720);   // optional; must come before begin()
+  display.begin();
+}
+```
+
+`resolutionCount()` / `resolution(i, &w, &h, &hz)` list them (index 0 = default), `printResolutions()`
+prints them, `refreshHz()` / `pixelClockHz()` give the timing in use. `setResolution(w, h, hz)` picks
+between two timings of one size (`LB_HDMI_RGB` has 800x600 at 50 and 56 Hz).
+
+| Board | `setResolution(...)` accepts (default first) |
+|---|---|
+| `LB_VGA_16BIT` | 800x600 @50, 640x480 @60 |
+| `LB_HDMI_RGB` | 800x600 @50, 640x480 @64.7, 720x480 @60, 720x576 @50, 800x600 @56, 1024x768 @34.6, 1280x720 @30, 1366x768 @27, 1280x800 @27 |
+| `LB_HDMI_VGA` | 720x576 @49.4, 720x480 @59, 640x480 @57 |
+
+The sizes above 800x600 on `LB_HDMI_RGB` run at 27-35 Hz and some monitors refuse them ("no signal").
+`LB_HDMI_RGB` starts at 800x600 @50. For something that must work on any monitor or TV use 640x480, 720x480 or 720x576.
+
+## HDMI (`LB_HDMI_RGB`, `LB_HDMI_VGA`) - ESP32-S3 boards
+
+`LB_HDMI_RGB`: RGB565 + pixel clock into a SiI9022A HDMI transmitter. `begin()` sets the chip up over
+I2C (SDA 5, SCL 4 - a sketch that also uses Wire must use those pins and must not call Wire.begin()
+with others) and a background task re-initialises it when the HDMI cable is plugged back in or a TV
+powers up. `hdmiConnected()` = a monitor is plugged in and on. Sound: the chip is set up for I2S,
+16-bit, 44.1 kHz, stereo; I2S pins from `display.wiringRgb().i2sBclk / i2sWs / i2sDout` (42/41/40),
+standard Philips I2S with 32-bit slots, sample in the top 16 bits (see example `Hdmi07_Sound`; for
+MP3 the ESP32-audioI2S library works on the same pins). Tools: ESP32S3 Dev Module, PSRAM "OPI PSRAM"
+(required), USB CDC On Boot "Enabled" (serial is the native USB port), Huge APP for big sketches.
+Examples `Hdmi01_Hello` ... `Hdmi10_LVGL`; the `Vga*` examples also run with the constant changed.
+
+`LB_HDMI_VGA`: an R-2R ladder (VGA) into an MS9288C converter; picture only, no setup, no sound yet.
+Not yet verified through this library.
+
+Everything in the VGA section below about drawing speed, `flush()`, `scanStats()` and Wi-Fi applies
+to both HDMI boards too.
+
+## VGA 16-bit (`LB_VGA_16BIT`) - on sale
+
+Renamed from `LB_VGA_800X600` in 0.2.0 (the old name still compiles, deprecated, same 800x600 default).
+A Lonely Binary VGA board with an ESP32-S3 (N16R8). 800 x 600 @ 50 Hz by default (32 MHz pixel clock), RGB565,
 scanned out of a PSRAM framebuffer; no controller, no touch, S3 only, rotation 0
 only, MicroPython not supported. Same `LB_Display` API as every other panel.
 

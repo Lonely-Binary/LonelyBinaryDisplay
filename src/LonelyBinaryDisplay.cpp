@@ -57,13 +57,100 @@ void LB_Display::setWiring(const LB_WiringRgb &w) {
   _rgbBoard.touchInt = w.touchInt; _rgbBoard.touchRst = w.touchRst;
   _rgbBoard.touchSck = w.touchSck; _rgbBoard.touchMiso = w.touchMiso;
   _rgbBoard.touchMosi = w.touchMosi; _rgbBoard.touchCs = w.touchCs;
+  _rgbBoard.i2sBclk = w.i2sBclk; _rgbBoard.i2sWs = w.i2sWs; _rgbBoard.i2sDout = w.i2sDout;
+  _rgbBoard.i2cSda = w.i2cSda; _rgbBoard.i2cScl = w.i2cScl;
+}
+
+// ─── Resolution ──────────────────────────────────────────────────────────────
+
+uint8_t LB_Display::resolutionCount() const {
+  if (!rgb()) return 1;
+  return _panel->rgb->modes ? _panel->rgb->modeCount : 1;
+}
+
+static float modeHz(uint16_t w, uint16_t h, uint32_t pclk, uint16_t hp, uint16_t hb, uint16_t hf, uint16_t vp, uint16_t vb,
+                    uint16_t vf) {
+  return (float)pclk / ((float)(w + hp + hb + hf) * (float)(h + vp + vb + vf));
+}
+
+bool LB_Display::resolution(uint8_t i, uint16_t *w, uint16_t *h, float *hz) const {
+  if (i >= resolutionCount()) return false;
+  if (!rgb() || !_panel->rgb->modes) {
+    if (w) *w = _panel->width;
+    if (h) *h = _panel->height;
+    if (hz) {
+      const LB_RgbBoard *b = _panel->rgb;
+      *hz = b ? modeHz(_panel->width, _panel->height, b->pclkHz, b->hsPulse, b->hsBack, b->hsFront, b->vsPulse, b->vsBack,
+                       b->vsFront) : 0;
+    }
+    return true;
+  }
+  const LB_RgbMode &m = _panel->rgb->modes[i];
+  if (w) *w = m.width;
+  if (h) *h = m.height;
+  if (hz) *hz = modeHz(m.width, m.height, m.pclkHz, m.hsPulse, m.hsBack, m.hsFront, m.vsPulse, m.vsBack, m.vsFront);
+  return true;
+}
+
+void LB_Display::printResolutions(Print &out) const {
+  out.printf("%s takes:\n", _panel->name);
+  for (uint8_t i = 0; i < resolutionCount(); i++) {
+    uint16_t w, h;
+    float hz;
+    resolution(i, &w, &h, &hz);
+    // A size listed twice needs the rate as well; the first of the two is what (w, h) alone picks.
+    bool twin = false;
+    for (uint8_t j = 0; j < resolutionCount(); j++) {
+      uint16_t w2, h2;
+      if (j != i && resolution(j, &w2, &h2) && w2 == w && h2 == h) twin = true;
+    }
+    char call[40];
+    if (twin) snprintf(call, sizeof call, "setResolution(%u, %u, %u)", w, h, (unsigned)(hz + 0.5f));
+    else snprintf(call, sizeof call, "setResolution(%u, %u)", w, h);
+    out.printf("  %-28s %.1f Hz%s\n", call, hz, i == 0 ? "   (default)" : "");
+  }
+}
+
+float LB_Display::refreshHz() const {
+  if (!rgb()) return 0;
+  const LB_RgbBoard &b = _rgbBoard;
+  return modeHz(_resW, _resH, b.pclkHz, b.hsPulse, b.hsBack, b.hsFront, b.vsPulse, b.vsBack, b.vsFront);
+}
+
+bool LB_Display::setResolution(uint16_t w, uint16_t h, uint8_t hz) {
+  if (_tft) {
+    Serial.println(F("[LB_Display] setResolution() must come before begin()."));
+    return false;
+  }
+  for (uint8_t i = 0; i < resolutionCount(); i++) {
+    uint16_t mw, mh;
+    float mhz;
+    resolution(i, &mw, &mh, &mhz);
+    if (mw != w || mh != h || (hz && (uint8_t)(mhz + 0.5f) != hz)) continue;
+    if (rgb() && _panel->rgb->modes) {
+      const LB_RgbMode &m = _panel->rgb->modes[i];
+      LB_RgbBoard &b = _rgbBoard;
+      b.pclkHz = m.pclkHz;
+      b.hsPulse = m.hsPulse; b.hsBack = m.hsBack; b.hsFront = m.hsFront;
+      b.vsPulse = m.vsPulse; b.vsBack = m.vsBack; b.vsFront = m.vsFront;
+      b.syncIdleHigh = m.syncIdleHigh;
+      b.clkSrc = m.clkSrc;
+    }
+    _resW = w;
+    _resH = h;
+    return true;
+  }
+  Serial.printf("[LB_Display] %u x %u%s is not a resolution this board has been measured at. ", w, h, hz ? " at that rate" : "");
+  printResolutions(Serial);
+  return false;
 }
 
 LB_WiringRgb LB_Display::wiringRgb() const {
   const LB_RgbBoard &b = _rgbBoard;
   LB_WiringRgb w = {b.hsync, b.vsync, b.de, b.pclk, b.backlight, {},
                     b.touchSda, b.touchScl, b.touchInt, b.touchRst,
-                    b.touchSck, b.touchMiso, b.touchMosi, b.touchCs};
+                    b.touchSck, b.touchMiso, b.touchMosi, b.touchCs,
+                    b.i2sBclk, b.i2sWs, b.i2sDout, b.i2cSda, b.i2cScl};
   for (int i = 0; i < 16; i++) w.data[i] = b.data[i];
   return w;
 }
@@ -100,7 +187,7 @@ bool LB_Display::begin(bool useCanvas) {
   if (rgb()) {
     // No bus and no controller: the S3 scans the panel out of a framebuffer
     // that the driver allocates in PSRAM.
-    _tft = new LB_RgbScreen(_panel, _rgbBoard);
+    _tft = new LB_RgbScreen(_panel, _rgbBoard, _resW, _resH);
   } else if (par8()) {
     _bus = new LB_TFTPar8Bus(_wiringPar8.data, _wiringPar8.wr, _wiringPar8.dc,
                              _wiringPar8.cs, _wiringPar8.rd);
@@ -307,7 +394,8 @@ void LB_Display::printInfo(Print &out) const {
   out.printf("Resolution : %dx%d  (native %dx%d, rotation %d)\n",
              width(), height(), _panel->width, _panel->height, _panel->rotation);
   if (rgb())
-    out.printf("Bus        : 16-bit RGB, pixel clock %lu Hz\n", (unsigned long)_rgbBoard.pclkHz);
+    out.printf("Bus        : 16-bit RGB, pixel clock %lu Hz, %ux%u @ %.1f Hz%s\n", (unsigned long)_rgbBoard.pclkHz, _resW, _resH,
+               refreshHz(), _rgbBoard.hdmiTx == LB_HDMI_TX_SII9022 ? (hdmiConnected() ? ", HDMI connected" : ", HDMI not connected") : "");
   else if (par8())
     out.println(F("Bus        : 8-bit parallel"));
   else

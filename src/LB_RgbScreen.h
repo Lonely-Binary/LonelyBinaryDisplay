@@ -27,15 +27,17 @@
 class LB_RgbScreen : public LB_Screen
 {
 public:
-  LB_RgbScreen(const LB_PanelDef *panel, const LB_RgbBoard &board) : _panel(panel), _board(board) {}
+  // width / height: the resolution to run at (the panel's own, or one of the board's modes - the timings in `board` match it).
+  LB_RgbScreen(const LB_PanelDef *panel, const LB_RgbBoard &board, uint16_t width, uint16_t height)
+      : _panel(panel), _board(board), _w(width), _h(height) {}
   ~LB_RgbScreen();
 
   bool begin(int32_t hz, bool bgr, bool invert) override;
   void setRotation(uint8_t r) override;
   void setColorOrder(bool) override {}   /* fixed by the wiring: see the panel table */
   void setInverted(bool) override {}     /* no controller to invert */
-  int16_t width() const override { return _panel->width; }
-  int16_t height() const override { return _panel->height; }
+  int16_t width() const override { return _w; }
+  int16_t height() const override { return _h; }
   uint8_t rotation() const override { return 0; }
   void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) override;
   void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t *px) override;
@@ -47,7 +49,8 @@ public:
 
 private:
   const LB_PanelDef *_panel;
-  LB_RgbBoard _board;        /* the panel's board, with any pins the sketch changed */
+  LB_RgbBoard _board;        /* the panel's board, with any pins the sketch changed and the chosen resolution's timing */
+  uint16_t _w, _h;           /* the resolution being scanned out */
   void *_handle = nullptr;   /* esp_lcd_panel_handle_t, kept opaque here */
   uint16_t *_fb = nullptr;
   uint16_t *_fb2 = nullptr;      /* second buffer, when there was PSRAM for it */

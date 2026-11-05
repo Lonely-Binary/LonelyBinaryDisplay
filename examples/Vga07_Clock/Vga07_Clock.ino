@@ -41,7 +41,7 @@
 
 #define PIN_BOOT   0   // the on-board BOOT button
 
-LB_Display display(LB_VGA_800X600);
+LB_Display display(LB_VGA_16BIT);
 
 static const lb_color_t BG    = LB_RGB(8, 12, 18);
 static const lb_color_t FACE  = LB_RGB(16, 24, 34);

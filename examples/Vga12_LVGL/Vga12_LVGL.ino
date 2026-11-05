@@ -49,7 +49,7 @@
 
 #define PIN_BOOT   0   // the on-board BOOT button
 
-LB_Display display(LB_VGA_800X600);
+LB_Display display(LB_VGA_16BIT);
 
 static lv_obj_t *page1, *page2;
 static lv_obj_t *tempArc, *tempLabel, *heapArc, *heapLabel, *psramBar, *psramLabel, *chart, *fpsLabel, *pageLabel;

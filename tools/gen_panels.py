@@ -130,6 +130,20 @@ def gen_header(doc) -> str:
         "// Which wiring set the panel uses: LB_WIRING (SPI) or LB_WIRING_PAR8.",
         "enum LB_Bus : uint8_t { LB_BUS_SPI, LB_BUS_PAR8, LB_BUS_RGB };",
         "",
+        "// One resolution of an RGB board: the size and the timing that produces it.",
+        "// clkSrc: 0 = the LCD peripheral's default clock, 1 = PLL160M, 2 = PLL240M",
+        "// (an integer divide of one of these has no cycle-to-cycle jitter).",
+        "struct LB_RgbMode {",
+        "  uint16_t width, height;",
+        "  uint32_t pclkHz;",
+        "  uint16_t hsPulse, hsBack, hsFront, vsPulse, vsBack, vsFront;",
+        "  bool     syncIdleHigh;   // negative sync pulses",
+        "  uint8_t  clkSrc;",
+        "};",
+        "",
+        "// Transmitter chips an RGB board may carry, set up over I2C by begin().",
+        "enum LB_HdmiTx : uint8_t { LB_HDMI_TX_NONE, LB_HDMI_TX_SII9022 };",
+        "",
         "// A board whose display is 16-bit parallel RGB: timings and every pin,",
         "// fixed by the PCB. Data pins in LCD_CAM order: B0-B4, G0-G5, R0-R4.",
         "struct LB_RgbBoard {",
@@ -143,6 +157,14 @@ def gen_header(doc) -> str:
         "  // Appended, so older initialisers still compile (as false, false).",
         "  bool     syncIdleHigh;   // sync pulses are active LOW (idle high); false = idle low, as a DE-mode panel is run",
         "  bool     directScan;     // scanned straight out of ONE PSRAM frame buffer: no bounce buffers, no second buffer",
+        "  // Appended in 0.2.0 (older initialisers get the defaults: one resolution, no transmitter).",
+        "  uint8_t  clkSrc;                  // as LB_RgbMode::clkSrc, for the default timing above",
+        "  const LB_RgbMode *modes;          // every resolution setResolution() accepts, the default first; nullptr = only the default",
+        "  uint8_t  modeCount;",
+        "  LB_HdmiTx hdmiTx;                 // a transmitter to set up over I2C, or LB_HDMI_TX_NONE",
+        "  int8_t   i2cSda, i2cScl;          // its I2C pins",
+        "  uint8_t  i2cAddr;                 // its 7-bit address",
+        "  int8_t   i2sBclk, i2sWs, i2sDout; // the board's I2S audio input (HDMI sound), -1 = none",
         "};",
         "",
         "// A loose 8-bit parallel module: its own pins, -1 = tied off on the module.",
@@ -197,12 +219,35 @@ def gen_header(doc) -> str:
         "};",
         "",
     ]
+    CLK = {None: 0, "default": 0, "pll160": 1, "pll240": 2}
+    for p in panels:
+        if bus_of(p) != "rgb":
+            continue
+        r = p["rgb"]
+        modes = [dict(width=p["width"], height=p["height"], pclk_hz=r["pclk_hz"], hsync=r["hsync"], vsync=r["vsync"],
+                      sync_idle_high=r.get("sync_idle_high"), clk_src=r.get("clk_src"))] + list(r.get("modes", []))
+        if len(modes) < 2:
+            continue
+        L.append(f"static const LB_RgbMode LB_MODES_{p['id'].upper()}[] = {{")
+        for m in modes:
+            total_h = m["width"] + m["hsync"]["pulse"] + m["hsync"]["back"] + m["hsync"]["front"]
+            total_v = m["height"] + m["vsync"]["pulse"] + m["vsync"]["back"] + m["vsync"]["front"]
+            L.append(
+                f"  {{ {m['width']}, {m['height']}, {m['pclk_hz']}, "
+                f"{m['hsync']['pulse']}, {m['hsync']['back']}, {m['hsync']['front']}, "
+                f"{m['vsync']['pulse']}, {m['vsync']['back']}, {m['vsync']['front']}, "
+                f"{cbool(m.get('sync_idle_high'))}, {CLK[m.get('clk_src')]} }},"
+                f"   // {m['width']}x{m['height']} @ {m['pclk_hz'] / total_h / total_v:.1f} Hz"
+            )
+        L.append("};")
     for p in panels:
         if bus_of(p) != "rgb":
             continue
         r, pins, t = p["rgb"], p["rgb"]["pins"], touch_of(p).get("pins", {})
         data = pins["b"] + pins["g"] + pins["r"]
         tp = lambda k: t.get(k, -1)
+        nmodes = 1 + len(r.get("modes", []))
+        i2c, i2s = r.get("i2c", {}), r.get("i2s", {})
         L.append(
             f"static const LB_RgbBoard LB_RGB_{p['id'].upper()} = {{ {r['pclk_hz']}, "
             f"{r['hsync']['pulse']}, {r['hsync']['back']}, {r['hsync']['front']}, "
@@ -211,7 +256,11 @@ def gen_header(doc) -> str:
             f"{pins['pclk']}, {pins['backlight']}, {{{', '.join(map(str, data))}}}, "
             f"{tp('sda')}, {tp('scl')}, {tp('int')}, {tp('rst')}, "
             f"{tp('sck')}, {tp('miso')}, {tp('mosi')}, {tp('cs')}, "
-            f"{cbool(r.get('sync_idle_high'))}, {cbool(r.get('direct_scan'))} }};"
+            f"{cbool(r.get('sync_idle_high'))}, {cbool(r.get('direct_scan'))}, "
+            f"{CLK[r.get('clk_src')]}, {f'LB_MODES_{p[chr(105)+chr(100)].upper()}' if nmodes > 1 else 'nullptr'}, {nmodes}, "
+            f"{ {None: 'LB_HDMI_TX_NONE', 'sii9022': 'LB_HDMI_TX_SII9022'}[r.get('hdmi_tx')] }, "
+            f"{i2c.get('sda', -1)}, {i2c.get('scl', -1)}, 0x{i2c.get('addr', 0):02X}, "
+            f"{i2s.get('bclk', -1)}, {i2s.get('ws', -1)}, {i2s.get('dout', -1)} }};"
         )
     for p in panels:
         if "spi" not in p:

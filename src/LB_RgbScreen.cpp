@@ -1,4 +1,5 @@
 #include "LB_RgbScreen.h"
+#include "LB_HdmiSii9022.h"
 
 #include <soc/soc_caps.h>
 #if SOC_LCD_RGB_SUPPORTED
@@ -41,13 +42,15 @@ bool LB_RgbScreen::begin(int32_t, bool, bool) {
   const LB_RgbBoard *b = &_board;
 
   esp_lcd_rgb_panel_config_t cfg = {};
-  cfg.clk_src = LCD_CLK_SRC_DEFAULT;
+  // An integer divide of PLL160 / PLL240 has no cycle-to-cycle jitter; a board that samples the picture with its own clock
+  // (the MS9288C VGA-to-HDMI converter) needs that, see panels.yaml.
+  cfg.clk_src = b->clkSrc == 1 ? LCD_CLK_SRC_PLL160M : b->clkSrc == 2 ? LCD_CLK_SRC_PLL240M : LCD_CLK_SRC_DEFAULT;
   cfg.timings.pclk_hz = b->pclkHz;
 #ifdef LB_RGB_PCLK_HZ
   cfg.timings.pclk_hz = LB_RGB_PCLK_HZ;   // a build may force the clock to compare
 #endif
-  cfg.timings.h_res = _panel->width;
-  cfg.timings.v_res = _panel->height;
+  cfg.timings.h_res = _w;
+  cfg.timings.v_res = _h;
   cfg.timings.hsync_pulse_width = b->hsPulse;
   cfg.timings.hsync_back_porch = b->hsBack;
   cfg.timings.hsync_front_porch = b->hsFront;
@@ -83,15 +86,15 @@ bool LB_RgbScreen::begin(int32_t, bool, bool) {
   // of at least ten that divides the height into an even number of buffers (480 -> 10, as before; 272 -> 17, 1.1 ms); a height with
   // none up to 40 takes the largest below ten that does, and one with none at all goes without bounce buffers.
   uint16_t bounceLines = 0;
-  for (uint16_t n = 10; n <= 40 && !bounceLines; n++) if (_panel->height % n == 0 && (_panel->height / n) % 2 == 0) bounceLines = n;
-  for (uint16_t n = 9; n >= 2 && !bounceLines; n--) if (_panel->height % n == 0 && (_panel->height / n) % 2 == 0) bounceLines = n;
+  for (uint16_t n = 10; n <= 40 && !bounceLines; n++) if (_h % n == 0 && (_h / n) % 2 == 0) bounceLines = n;
+  for (uint16_t n = 9; n >= 2 && !bounceLines; n--) if (_h % n == 0 && (_h / n) % 2 == 0) bounceLines = n;
   // A directScan panel has no bounce buffers, as the widely used Sunton configurations: its 10 MHz clock needs 20 MB/s, which the PSRAM
   // has plenty of. The bounce-buffer scheme counts refills in software, and one missed refill at start-up left the picture shifted
   // until the next boot (about four boots in ten, measured on the board).
 #ifdef LB_RGB_BOUNCE_LINES
   bounceLines = LB_RGB_BOUNCE_LINES;   // a build may force it (0 = none) to compare
 #endif
-  cfg.bounce_buffer_size_px = direct ? 0 : (size_t)_panel->width * bounceLines;
+  cfg.bounce_buffer_size_px = direct ? 0 : (size_t)_w * bounceLines;
   cfg.dma_burst_size = 64;
   cfg.hsync_gpio_num = b->hsync;
   cfg.vsync_gpio_num = b->vsync;
@@ -120,21 +123,25 @@ bool LB_RgbScreen::begin(int32_t, bool, bool) {
   if (cfg.num_fbs == 2) esp_lcd_rgb_panel_get_frame_buffer(h, 2, &fb, &fb2);
   else esp_lcd_rgb_panel_get_frame_buffer(h, 1, &fb);
   {
-    const size_t cleared = (size_t)_panel->width * _panel->height * 2;
+    const size_t cleared = (size_t)_w * _h * 2;
     if (fb) memset(fb, 0, cleared);
     if (fb2) memset(fb2, 0, cleared);
   }
   esp_lcd_panel_init(h);
   _handle = h;
-  s_expectUs = (uint32_t)(1000000.0 * (b->hsPulse + b->hsBack + _panel->width + b->hsFront) * (b->vsPulse + b->vsBack + _panel->height + b->vsFront) / cfg.timings.pclk_hz);
+  s_expectUs = (uint32_t)(1000000.0 * (b->hsPulse + b->hsBack + _w + b->hsFront) * (b->vsPulse + b->vsBack + _h + b->vsFront) / cfg.timings.pclk_hz);
   _fb = (uint16_t *)fb;
   _fb2 = (uint16_t *)fb2;
-  sync(0, 0, _panel->width, _panel->height);
+  sync(0, 0, _w, _h);
 
   _vsync = xSemaphoreCreateBinary();
   esp_lcd_rgb_panel_event_callbacks_t cbs = {};
   cbs.on_vsync = lb_rgb_on_vsync;
   esp_lcd_rgb_panel_register_event_callbacks(h, &cbs, _vsync);
+
+  // A board with an HDMI transmitter: now that the pixels are flowing, tell it what it is being sent. A transmitter that does
+  // not answer is reported but does not fail begin(): the scan-out itself is running.
+  if (b->hdmiTx == LB_HDMI_TX_SII9022) LB_HdmiSii9022::start(*b, _w, _h);
   return true;
 #else
   Serial.println(F("[LB_RgbScreen] RGB panels need an ESP32-S3 (LCD_CAM). This chip has none."));
@@ -155,8 +162,8 @@ void LB_RgbScreen::setRotation(uint8_t r) {
 void LB_RgbScreen::sync(int16_t x, int16_t y, int16_t w, int16_t h) {
 #if SOC_LCD_RGB_SUPPORTED
   if (!_handle || w <= 0 || h <= 0) return;
-  const int16_t W = _panel->width;
-  if (x == 0 && y == 0 && w == W && h == _panel->height) {
+  const int16_t W = _w;
+  if (x == 0 && y == 0 && w == W && h == _h) {
     esp_lcd_panel_draw_bitmap((esp_lcd_panel_handle_t)_handle, 0, 0, W, h, _fb);
     return;
   }
@@ -167,7 +174,7 @@ void LB_RgbScreen::sync(int16_t x, int16_t y, int16_t w, int16_t h) {
 
 void LB_RgbScreen::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
   if (!_fb) return;
-  const int16_t W = _panel->width, H = _panel->height;
+  const int16_t W = _w, H = _h;
   if (x < 0) { w += x; x = 0; }
   if (y < 0) { h += y; y = 0; }
   if (x + w > W) w = W - x;
@@ -182,7 +189,7 @@ void LB_RgbScreen::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t
 
 void LB_RgbScreen::pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t *px) {
   if (!_fb || !px) return;
-  const int16_t W = _panel->width, H = _panel->height;
+  const int16_t W = _w, H = _h;
   int16_t sx = 0, sy = 0, cw = w, ch = h;
   if (x < 0) { sx = -x; cw += x; x = 0; }
   if (y < 0) { sy = -y; ch += y; y = 0; }
@@ -201,7 +208,7 @@ void LB_RgbScreen::present(const uint16_t *fb) {
 #if SOC_LCD_RGB_SUPPORTED
   if (!_handle || !fb) return;
   xSemaphoreTake((SemaphoreHandle_t)_vsync, 0);                 // forget an old blank
-  esp_lcd_panel_draw_bitmap((esp_lcd_panel_handle_t)_handle, 0, 0, _panel->width, _panel->height, fb);
+  esp_lcd_panel_draw_bitmap((esp_lcd_panel_handle_t)_handle, 0, 0, _w, _h, fb);
   xSemaphoreTake((SemaphoreHandle_t)_vsync, pdMS_TO_TICKS(100));
 #endif
 }
@@ -209,8 +216,8 @@ void LB_RgbScreen::present(const uint16_t *fb) {
 void LB_RgbScreen::flushFramebuffer(const uint16_t *fb) {
   // The canvas and LVGL draw straight into our framebuffer, so there is
   // nothing to copy - only the cache to write back.
-  if (fb == _fb) sync(0, 0, _panel->width, _panel->height);
-  else pushImage(0, 0, _panel->width, _panel->height, fb);
+  if (fb == _fb) sync(0, 0, _w, _h);
+  else pushImage(0, 0, _w, _h, fb);
 }
 
 bool LB_RgbScreen::scanStats(uint32_t *frames, uint32_t *off, uint32_t *maxUs) {

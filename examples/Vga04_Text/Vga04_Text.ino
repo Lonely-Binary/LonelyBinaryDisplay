@@ -32,7 +32,7 @@
 #define PIN_R3     38
 #define PIN_R4     39
 
-LB_Display display(LB_VGA_800X600);
+LB_Display display(LB_VGA_16BIT);
 
 // Draw `s` with its right edge at x.
 static void drawRight(const char *s, int x, int y) { display.drawString(s, x - display.textWidth(s), y); }

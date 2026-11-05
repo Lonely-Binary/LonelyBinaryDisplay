@@ -40,7 +40,7 @@
 
 #define PIN_BOOT   0   // the on-board BOOT button
 
-LB_Display display(LB_VGA_800X600);
+LB_Display display(LB_VGA_16BIT);
 
 static const int GROUND = 470;                 // y of the ground line
 static const int PX = 140, PSIZE = 44;            // player x and size
