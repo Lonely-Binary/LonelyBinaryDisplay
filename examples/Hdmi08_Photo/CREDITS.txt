@@ -1,0 +1,10 @@
+The four pictures in photos.h are official NASA astronaut portraits, in the public domain
+(works of the U.S. federal government), from Wikimedia Commons:
+
+  0  Jonny Kim         https://commons.wikimedia.org/wiki/File:Jonny_Kim_official_portrait.jpg
+  1  Frank Rubio       https://commons.wikimedia.org/wiki/File:Frank_Rubio_official_portrait.jpg
+  2  Mae C. Jemison    https://commons.wikimedia.org/wiki/File:Mae_Carol_Jemison.jpg
+  3  Jasmin Moghbeli   https://commons.wikimedia.org/wiki/File:Jasmin_Moghbeli_official_portrait.jpg
+
+Faces show up resolution and colour problems more plainly than anything else, which is why
+this example uses portraits. Replace them with your own: see the top of Hdmi08_Photo.ino.

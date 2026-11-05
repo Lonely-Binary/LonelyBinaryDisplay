@@ -47,7 +47,7 @@
 #define PIN_R3     38
 #define PIN_R4     39
 
-LB_Display display(LB_VGA_800X600);
+LB_Display display(LB_VGA_16BIT);
 
 // The names of the 16 data lines, in the order of the bits of an RGB565 word.
 static const char *BIT_NAME[16] = {"B0", "B1", "B2", "B3", "B4", "G0", "G1", "G2",

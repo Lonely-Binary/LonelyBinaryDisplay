@@ -22,13 +22,21 @@ Arduino/C++ **and** MicroPython, from one shared panel table.
 > `TFT_eSPI` and `Adafruit_ST7789` code it was trained on, which is confidently
 > wrong for these panels and reads like a dead screen.
 
-> **Now on sale: the Lonely Binary ESP32-S3 VGA 800 x 600.** A VGA output
+> **Now on sale: the Lonely Binary ESP32-S3 VGA 16-bit.** A VGA output
 > board that plugs into any monitor, sold together with an ESP32-S3 (N16R8).
-> `LB_Display display(LB_VGA_800X600);` and the same drawing calls as every
-> other display here. [Jump to it](#vga-800-x-600-esp32-s3) - twelve examples
+> `LB_Display display(LB_VGA_16BIT);` and the same drawing calls as every
+> other display here. [Jump to it](#vga-16-bit-esp32-s3) - twelve examples
 > take you from `Hello` to a game and an LVGL dashboard.
 >
-> **VGA requires PSRAM to be enabled.** In the Arduino IDE set
+> **New: HDMI.** `LB_HDMI_RGB` (RGB to HDMI, picture **and sound**) and
+> `LB_HDMI_VGA` (VGA to HDMI). [Jump to it](#hdmi-esp32-s3) - ten examples,
+> from `Hello` to sound, portraits and LVGL.
+>
+> **0.2.0 renamed `LB_VGA_800X600` to `LB_VGA_16BIT`.** The board is not tied
+> to one size: pick it with `display.setResolution(w, h)`. The old name still
+> compiles, with the same 800 x 600 default, and warns.
+>
+> **VGA and HDMI require PSRAM to be enabled.** In the Arduino IDE set
 > **Tools ▸ PSRAM ▸ OPI PSRAM** before you upload. Without it the screen stays
 > blank.
 
@@ -67,7 +75,9 @@ Arduino/C++ **and** MicroPython, from one shared panel table.
 | 2.0 inch square | `LB_SQUARE_200` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 2.31 inch square | `LB_SQUARE_231` | not supported | 320 x 240 | ILI9342 | SPI 40 MHz | — | active low |
 | 3.92 inch square | `LB_SQUARE_392` | `SQUARE_392` | 320 x 320 | ST7796 | SPI 40 MHz | — | active high |
-| VGA 800 x 600, with ESP32-S3 | `LB_VGA_800X600` | not supported | 800 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
+| VGA 16-bit, with ESP32-S3 | `LB_VGA_16BIT` | not supported | 800 x 600 (default) | RGB | 16-bit RGB (S3 only) | — | — |
+| RGB to HDMI, with ESP32-S3 | `LB_HDMI_RGB` | not supported | 800 x 600 (default) | SiI9022A | 16-bit RGB (S3 only) | — | — |
+| VGA to HDMI, with ESP32-S3 | `LB_HDMI_VGA` | not supported | 720 x 576 (default) | MS9288C | 16-bit RGB (S3 only) | — | — |
 | 4.3 inch RGB | `LB_RGB_430_480X272` | not supported | 480 x 272 | RGB | 16-bit RGB (S3 only) | — | active high |
 | 7 inch RGB | `LB_RGB_700_1024X600` | not supported | 1024 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
 | 10.1 inch RGB | `LB_RGB_1010_1024X600` | not supported | 1024 x 600 | RGB | 16-bit RGB (S3 only) | — | active high |
@@ -104,7 +114,7 @@ from it, and there is never more than one entry for a size.
 
 ---
 
-## VGA 800 x 600 (ESP32-S3)
+## VGA 16-bit (ESP32-S3)
 
 > ## ⚠️ PSRAM MUST BE ENABLED
 >
@@ -124,7 +134,8 @@ from it, and there is never more than one entry for a size.
 **Available now.** The Lonely Binary VGA board is sold together with an
 ESP32-S3 (N16R8: 16 MB flash, 8 MB octal PSRAM). It turns 16 GPIO lines into
 the three analog colour signals of a VGA connector with a resistor ladder and
-sends an **800 x 600 @ 50 Hz** picture, 65,536 colours, to any VGA
+sends an **800 x 600 @ 50 Hz** picture by default (`setResolution(640, 480)`
+gives 640 x 480 @ 60 Hz, see [Resolutions](#resolutions)), 65,536 colours, to any VGA
 monitor (a 32 MHz pixel clock: the standard 56 Hz timing needs 36 MHz, which
 leaves the memory reads that feed the screen no margin and shows as short
 streaks at the left of some lines). There is no controller and no screen memory on the board: the
@@ -134,9 +145,10 @@ PSRAM.
 ```cpp
 #include <LonelyBinaryDisplay.h>
 
-LB_Display display(LB_VGA_800X600);
+LB_Display display(LB_VGA_16BIT);
 
 void setup() {
+  // display.setResolution(640, 480);   // optional, before begin(); default 800 x 600
   display.begin();
   display.fillScreen(LB_BLACK);
   display.setTextColor(LB_WHITE);
@@ -220,9 +232,145 @@ frame.
 ### Pins
 
 The pins are fixed by the board and need no setup. They are
-in `panels.yaml` (entry `vga_800x600`): HSYNC GPIO 2, VSYNC GPIO 1,
+in `panels.yaml` (entry `vga_16bit`): HSYNC GPIO 2, VSYNC GPIO 1,
 R0..R4 = 7, 15, 16, 38, 39; G0..G5 = 17, 18, 8, 3, 9, 10;
 B0..B4 = 11, 12, 13, 14, 21. UART0 (the serial port) is GPIO 43 / 44.
+
+---
+
+## HDMI (ESP32-S3)
+
+Two boards, both sold with an ESP32-S3 (N16R8), both drawn on exactly like
+every other display here. **Tools ▸ PSRAM ▸ OPI PSRAM is required** (the
+picture is scanned out of a frame buffer in PSRAM, as on the VGA board).
+
+| Board | Constant | How the picture gets to HDMI | Sound | Default |
+|---|---|---|---|---|
+| RGB to HDMI | `LB_HDMI_RGB` | RGB565 + pixel clock into a **SiI9022A** transmitter, set up by `begin()` over I2C | **yes**, I2S into the SiI9022A | 800 x 600 |
+| VGA to HDMI | `LB_HDMI_VGA` | an R-2R ladder (VGA) into an **MS9288C** converter, no setup needed | not yet | 720 x 576 |
+
+```cpp
+#include <LonelyBinaryDisplay.h>
+
+LB_Display display(LB_HDMI_RGB);
+
+void setup() {
+  display.setResolution(640, 480);   // optional, before begin(); default 800 x 600 (table below)
+  display.begin();                   // starts the picture and sets the SiI9022A up
+  display.fillScreen(LB_BLACK);
+  display.setTextColor(LB_WHITE);
+  display.setTextSize(6);
+  display.drawString("Hello, HDMI!", 40, 40);
+  display.flush();
+}
+
+void loop() {}
+```
+
+### Resolutions
+
+A VGA or HDMI board is not a screen of one size, so the constant names the
+board and `setResolution()` picks the size - on the VGA board too. **Call it
+before `begin()`.** A size the board has not been measured at is refused (it
+returns `false` and lists the ones it takes on Serial); `width()` and
+`height()` follow the size you picked.
+
+| | |
+|---|---|
+| `setResolution(w, h)` | Pick a size, before `begin()`. `setResolution(w, h, hz)` picks between two timings of the same size. |
+| `resolutionCount()`, `resolution(i, &w, &h, &hz)` | What the board takes; index 0 is the default. |
+| `printResolutions()` | The same list on Serial. |
+| `refreshHz()`, `pixelClockHz()` | The timing in use. |
+
+`LB_HDMI_RGB`, all measured on the board on 2026-11-04 (two RGB565 frame
+buffers, a box being redrawn while it scans out; 0 late frames in each):
+
+| `setResolution(...)` | Refresh | Pixel clock | Monitors |
+|---|---|---|---|
+| `800, 600` (default) | 49.9 Hz | 32 MHz | most - every example starts here |
+| `640, 480` | 64.7 Hz | 27.18 MHz | nearly all - **the safe one**: use it if the default shows no picture or streaks at the left |
+| `720, 480` | 59.9 Hz | 27 MHz | nearly all (CEA 480p) |
+| `720, 576` | 49.9 Hz | 27 MHz | nearly all (CEA 576p) |
+| `800, 600, 56` | 56.2 Hz | 36 MHz | most (VESA) |
+| `1024, 768` | 34.6 Hz | 32 MHz | **some refuse it** |
+| `1280, 720` | 30.0 Hz | 32 MHz | **some refuse it** (TVs usually take 720p30) |
+| `1366, 768` | 27.1 Hz | 32 MHz | **many refuse it** (experimental) |
+| `1280, 800` | 27.1 Hz | 32 MHz | **many refuse it** (experimental) |
+
+**Why the big sizes have low refresh rates.** The S3 sends every pixel itself,
+and past a pixel clock of about 32-36 MHz it cannot read the frame buffer out
+of PSRAM fast enough (1024 x 768 @ 60 needs 65 MHz). So the big sizes keep the
+clock and give up refresh rate. Every one of them runs on the board; whether
+it shows is up to the monitor, and one that will not take 27-35 Hz says
+"no signal" or "out of range". Every line also keeps at least 128 pixels of
+blanking, because HDMI sound travels in that gap.
+
+`LB_HDMI_VGA` takes `720, 576` (default, 49.4 Hz), `720, 480` and `640, 480`.
+Its MS9288C rebuilds its sampling clock from HSYNC, so every pixel clock there
+is an integer divide (a fractional one shows as ragged vertical edges), and
+40 MHz and up does not work. **Not yet run through this library** - the
+timings are the ones its own test firmware measured.
+
+`LB_VGA_16BIT` takes `800, 600` (default, 50 Hz) and `640, 480` (60 Hz).
+
+### Sound (`LB_HDMI_RGB`)
+
+`begin()` sets the SiI9022A up for **I2S, 16-bit, 44.1 kHz, stereo**; send
+that on the board's I2S pins and it comes out of the TV. The pins come with the
+board: `display.wiringRgb().i2sBclk / i2sWs / i2sDout` (42, 41, 40). Use
+standard (Philips) I2S with 32-bit slots and the sample in the top 16 bits.
+`Hdmi07_Sound` plays a tune with nothing but the ESP32's own I2S driver; for
+MP3s the ESP32-audioI2S library plays to the same three pins.
+
+### Plugging and unplugging
+
+The SiI9022A's reset is tied to the board's RST button, not to a GPIO, and its
+interrupt line is not wired. So `begin()` always sets the chip up from scratch,
+and a small background task looks at the hot-plug line every 200 ms: when a
+monitor is plugged in or switched on, or the chip has lost its setup, it sets
+it up again (`hdmiRestarts()` counts that). `hdmiConnected()` is true while a
+monitor is plugged in and on. A TV can still take a few seconds to lock on.
+
+### Board settings (Tools menu)
+
+| Setting | `LB_HDMI_RGB` | If you get it wrong |
+|---|---|---|
+| Board | **ESP32S3 Dev Module** | |
+| PSRAM | **OPI PSRAM** (**required**) | `begin()` returns false and the monitor says "no signal" |
+| USB CDC On Boot | **Enabled** | `Serial` shows nothing: this board's serial port is the native USB |
+| Partition Scheme | **Huge APP** | Only the photo and LVGL examples need it |
+
+### Examples (`LB_HDMI_RGB`)
+
+Start at the top and go down: each one adds one idea to the ones before.
+
+| Example | You build | You learn |
+|---|---|---|
+| `Hdmi01_Hello` | Text in the middle of the screen | The lines every sketch starts with; `flush()`; `hdmiConnected()` |
+| `Hdmi02_ColorBars` | Colour bars, ramps and 16 wiring patches | Self-test: find a bad data line. **Run this first.** |
+| `Hdmi03_Resolutions` | A test card at every size, BOOT for the next | `setResolution()`, the resolution list, overscan |
+| `Hdmi04_Text` | Two fonts, sizes, colours, alignment | Text that lays itself out at any resolution |
+| `Hdmi05_Shapes` | Every shape on a grid | The coordinate system; `draw*` vs `fill*` |
+| `Hdmi06_Bounce` | Bouncing balls | The animation loop; frame timing |
+| `Hdmi07_Sound` | A tune from the TV's speakers, notes on screen | I2S sound over HDMI, with no extra library |
+| `Hdmi08_Photo` | A slideshow of portraits | `drawJpg`; `make_photos.py` for your own pictures |
+| `Hdmi09_Dashboard` | A status board for the ESP32-S3 | Tiles, big numbers, bars, sparklines |
+| `Hdmi10_LVGL` | A full widget dashboard | LVGL (needs *Lonely Binary LVGL*) |
+
+The `Vga*` examples run on the HDMI boards too: change the constant and the
+pin block at the top.
+
+### Pins
+
+Fixed by the board, in `panels.yaml`. `LB_HDMI_RGB`: DE 45, PCLK 12, HSYNC 38,
+VSYNC 39; R0..R4 = 18, 17, 16, 15, 6; G0..G5 = 11, 10, 9, 46, 3, 8;
+B0..B4 = 48, 47, 21, 14, 13; I2C to the SiI9022A SDA 5 / SCL 4 (address 0x3B -
+**the library's: a sketch that also uses Wire must use these two pins**); I2S
+BCLK 42, WS 41, DOUT 40. `LB_HDMI_VGA`: HSYNC 4, VSYNC 5; R0..R4 = 38, 39, 40,
+41, 42; G0..G5 = 10, 9, 46, 3, 8, 18; B0..B4 = 17, 16, 15, 7, 6. The engineering
+notes are in [`docs/HDMI_RGB.md`](docs/HDMI_RGB.md).
+
+---
 
 ## Arduino
 
@@ -392,6 +540,8 @@ reports it.
 | `backlight(0..255)` | PWM on every panel. Active-high vs active-low is decided by the panel table, not by you. |
 | `setWiring(pins)` | Your own GPIOs. Before `begin()`. |
 | `setSpiHz(hz)` | Override the panel's SPI clock. Before `begin()`; `0` restores the default. |
+| `setResolution(w, h)` | VGA and HDMI boards: the screen size, from the ones the board takes. Before `begin()`. See [Resolutions](#resolutions). |
+| `hdmiConnected()` | `LB_HDMI_RGB`: a monitor is plugged in and on. |
 | `setColorOrder(order)` | `COLOR_AUTO` / `COLOR_RGB` / `COLOR_BGR`. Any time. |
 | `setInverted(bool)` | Set the panel's inversion. Any time. |
 | `setBacklightActiveLow(bool)` | Flip the backlight polarity. Any time. |

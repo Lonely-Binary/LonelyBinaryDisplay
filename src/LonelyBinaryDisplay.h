@@ -38,6 +38,13 @@
 #include "LB_Colors.h"
 #include "LB_Panels.h"
 #include "LB_Wiring.h"
+#include "LB_HdmiSii9022.h"
+
+// Renamed in 0.2.0: the VGA board is not tied to 800x600, so its constant names the board (16-bit, 5-6-5 ladder) and the
+// resolution is chosen with setResolution(). The old name still works, with the old default (800x600), and warns.
+[[deprecated("LB_VGA_800X600 is now LB_VGA_16BIT (same board, same 800x600 default; other sizes via setResolution())")]]
+static inline const LB_PanelDef *LB_VGA_800X600_renamed() { return LB_VGA_16BIT; }
+#define LB_VGA_800X600 (LB_VGA_800X600_renamed())
 
 // The pins of a 16-bit RGB board (the VGA board, the Sunton boards). The timings
 // belong to the screen and stay in the panel table; only the GPIOs are here.
@@ -47,6 +54,8 @@ struct LB_WiringRgb {
   int8_t data[16];
   int8_t touchSda, touchScl, touchInt, touchRst;   // I2C touch
   int8_t touchSck, touchMiso, touchMosi, touchCs;  // SPI touch
+  int8_t i2sBclk, i2sWs, i2sDout;                  // the board's I2S audio input (LB_HDMI_RGB: HDMI sound), -1 = none
+  int8_t i2cSda, i2cScl;                           // the HDMI transmitter's I2C (LB_HDMI_RGB), -1 = none
 };
 
 class LB_Display : private LB_TFTPanel, public LB_Canvas {
@@ -80,6 +89,8 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
       _wiring.backlight = b.backlight;   // spiHost stays the MCU's
     }
     if (panel->rgb) _rgbBoard = *panel->rgb;
+    _resW = panel->width;
+    _resH = panel->height;
     if (panel->par8) {
       const LB_Par8Board &b = *panel->par8;
       for (int i = 0; i < 8; i++) _wiringPar8.data[i] = b.data[i];
@@ -137,6 +148,43 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   //     display.setWiring(pins);
   void setWiring(const LB_WiringRgb &wiring);
   LB_WiringRgb wiringRgb() const;
+
+  // ── Resolution (the RGB boards: VGA and HDMI) ─────────────────────────────
+  //
+  // A VGA or HDMI board is not a screen of one size: the S3 sends whatever
+  // timing it is told to. The board constant starts at its default resolution
+  // (LB_VGA_16BIT 800x600, LB_HDMI_RGB 640x480, LB_HDMI_VGA 720x576);
+  // setResolution() picks another from the ones measured on that board.
+  //
+  //     LB_Display display(LB_HDMI_RGB);
+  //     display.setResolution(800, 600);   // before begin()
+  //     display.begin();
+  //
+  // hz picks between two timings of the same size; 0 = the first one listed.
+  // Returns false - and lists what the board does take on Serial - for a size
+  // the board has not been measured at, after begin(), or on a panel with a
+  // size of its own (a TFT is always its native size). width() and height()
+  // follow the resolution chosen.
+  bool setResolution(uint16_t width, uint16_t height, uint8_t hz = 0);
+  // The resolutions this board takes, for a menu or a demo that steps through
+  // them: index 0 is the default. hz is the refresh rate the timing produces.
+  uint8_t resolutionCount() const;
+  bool resolution(uint8_t index, uint16_t *width, uint16_t *height, float *hz = nullptr) const;
+  void printResolutions(Print &out = Serial) const;
+  // The refresh rate of the resolution in use (0 on a panel with a controller).
+  float refreshHz() const;
+  // The pixel clock of the resolution in use, in Hz (0 on a panel with a controller).
+  uint32_t pixelClockHz() const { return rgb() ? _rgbBoard.pclkHz : 0; }
+
+  // ── HDMI (LB_HDMI_RGB) ───────────────────────────────────────────────────
+  //
+  // begin() sets the board's SiI9022A transmitter up; unplugging and
+  // re-plugging the cable is handled in the background. hdmiConnected() is
+  // true while a monitor is plugged in and powered; hdmiRestarts() counts how
+  // often the transmitter was set up again since begin(). Both are false / 0
+  // on any other board.
+  bool hdmiConnected() const { return rgb() && _rgbBoard.hdmiTx == LB_HDMI_TX_SII9022 && LB_HdmiSii9022::connected(); }
+  uint32_t hdmiRestarts() const { return rgb() && _rgbBoard.hdmiTx == LB_HDMI_TX_SII9022 ? LB_HdmiSii9022::restarts() : 0; }
 
   // Override the panel table's SPI clock. Useful when your own wiring has
   // longer traces or a ribbon extension and the default rate is marginal —
@@ -301,6 +349,7 @@ class LB_Display : private LB_TFTPanel, public LB_Canvas {
   int16_t            _vcomOverride = -1;  // setVcom() before begin(), -1 = none
   LB_WiringPar8      _wiringPar8 = LB_WIRING_PAR8;
   LB_RgbBoard        _rgbBoard = {};      // the RGB board's pins; a copy so setWiring() can change them
+  uint16_t           _resW = 0, _resH = 0;  // RGB boards: the resolution begin() will run at
   LB_TFTBus         *_bus    = nullptr;
   LB_Touch          *_touch  = nullptr;
   LB_Screen         *_tft    = nullptr;  // the panel itself: LB_TFT or LB_RgbScreen

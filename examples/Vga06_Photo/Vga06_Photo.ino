@@ -51,7 +51,7 @@
 
 #define PIN_BOOT   0   // the on-board BOOT button
 
-LB_Display display(LB_VGA_800X600);
+LB_Display display(LB_VGA_16BIT);
 
 static const uint32_t SHOW_MS = 4000;
 

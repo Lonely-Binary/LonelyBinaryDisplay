@@ -44,7 +44,7 @@
 #define PIN_R3     38
 #define PIN_R4     39
 
-LB_Display display(LB_VGA_800X600);
+LB_Display display(LB_VGA_16BIT);
 
 void setup() {
   Serial.begin(115200);
